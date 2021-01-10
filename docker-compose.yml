@@ -1,0 +1,34 @@
+version: "3.8"
+services:
+  redis:
+    image: redis
+    networks: 
+      - webnet
+  db:
+    image: postgres
+    volumes: 
+      - ./pgdata:/var/lib/postgresql/data
+    networks: 
+      - webnet
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: slack
+  web:
+    image: inblack67/slack:latest
+    ports:
+      - "80:5000"
+    networks:
+      - webnet
+    depends_on:
+      - db
+      - redis
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      DB_HOST: db
+      REDIS_HOST: redis
+    env_file: 
+      .env
+networks:
+  webnet:
