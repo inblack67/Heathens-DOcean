@@ -16,8 +16,6 @@ services:
       POSTGRES_DB: slack
   web:
     image: inblack67/slack:latest
-    ports: 
-      - "80:5000"
     networks:
       - webnet
     depends_on:
