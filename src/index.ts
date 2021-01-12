@@ -76,7 +76,7 @@ const main = async () =>
     const sessionParser = session( {
         store: new RedisStore( { client: RedisClient } ),
         name: 'ts',
-        secret: process.env.SESSION_SECRET!,
+        secret: process.env.SESSION_SECRET,
         resave: false,
         saveUninitialized: false,
         cookie: {
@@ -84,7 +84,7 @@ const main = async () =>
             sameSite: 'none',
             secure: true,
             maxAge: 1000 * 60 * 60,
-            domain: process.env.CLIENT_DOMAIN
+            // domain: process.env.CLIENT_DOMAIN
         }
     } );
 
