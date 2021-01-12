@@ -10,7 +10,6 @@ import 'colors';
 import { createConnection } from "typeorm";
 import { UserEntity } from './entities/User';
 import { ChannelEntity } from './entities/Channel';
-import { isProd } from './utils/constants';
 import { MyContext } from './utils/types';
 import { MessageEntity } from './entities/Message';
 import { usersLoader, messagesLoader, channelLoader } from './utils/dataLoaders';
@@ -75,14 +74,14 @@ const main = async () =>
 
     const sessionParser = session( {
         store: new RedisStore( { client: RedisClient } ),
-        name: 'quid',
+        name: 'ts',
         secret: process.env.SESSION_SECRET!,
         resave: false,
         saveUninitialized: false,
         cookie: {
             httpOnly: true,
             sameSite: 'none',
-            secure: isProd(),
+            secure: true,
             maxAge: 1000 * 60 * 60,
         }
     } );
@@ -107,11 +106,7 @@ const main = async () =>
             const customError = errorFormatter( err );
             return customError;
         },
-        playground: {
-            settings: {
-                "request.credentials": "include"
-            }
-        }
+        playground: false,
     } );
 
     app.use( sessionParser );
