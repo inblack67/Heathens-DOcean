@@ -57,6 +57,7 @@ const main = async () =>
     }
 
     const app = express();
+    const ws = createServer( app );
 
     app.set( 'trust proxy', 1 );
 
@@ -86,6 +87,8 @@ const main = async () =>
         }
     } );
 
+    app.use( sessionParser );
+
     const apolloServer = new ApolloServer( {
         schema: await getSchema(),
         context: ( { req, res } ): MyContext => ( { req, res, session: req?.session, usersLoader: usersLoader(), messagesLoader: messagesLoader(), channelLoader: channelLoader(), pubsub: createPubSub() } ),
@@ -109,14 +112,8 @@ const main = async () =>
         playground: false,
     } );
 
-    app.use( sessionParser );
-
-    apolloServer.applyMiddleware( { app, cors: false } );
-
-    // app.use( errorHandler );
-
-    const ws = createServer( app );
     apolloServer.installSubscriptionHandlers( ws );
+    apolloServer.applyMiddleware( { app, cors: false } );
 
     const PORT = +process.env.PORT || 5000;
 

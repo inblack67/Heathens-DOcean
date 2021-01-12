@@ -4,5 +4,6 @@ declare namespace NodeJS {
     SESSION_SECRET: string;
     CLIENT_URL: string;
     CLIENT_DOMAIN: string;
+    NODE_ENV: string;
   }
 }
