@@ -3,7 +3,7 @@ declare namespace NodeJS {
     PORT: string;
     SESSION_SECRET: string;
     CLIENT_URL: string;
-    CLIENT_DOMAIN: string;
+    COOKIE_DOMAIN: string;
     NODE_ENV: string;
   }
 }

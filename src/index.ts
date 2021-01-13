@@ -81,10 +81,10 @@ const main = async () =>
         saveUninitialized: false,
         cookie: {
             httpOnly: true,
-            sameSite: 'none',
+            sameSite: 'lax',
             secure: true,
             maxAge: 1000 * 60 * 60,
-            // domain: process.env.CLIENT_DOMAIN
+            domain: process.env.COOKIE_DOMAIN
         }
     } );
 
