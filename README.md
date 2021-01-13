@@ -20,8 +20,8 @@
     - TypeScript
     - Redis
     - Material-UI
-    - Dokku
     - Docker
     - NGINX
     - DigitalOcean
     - Vercel
+- [Live](https://app.21heathens.tk)
