@@ -111,7 +111,7 @@ const main = async () =>
             const customError = errorFormatter( err );
             return customError;
         },
-        playground: true,
+        playground: false,
     } );
 
     apolloServer.installSubscriptionHandlers( ws );
