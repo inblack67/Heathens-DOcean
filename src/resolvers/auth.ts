@@ -8,6 +8,7 @@ import { ChannelEntity } from "../entities/Channel";
 import { getConnection } from "typeorm";
 import { MessageEntity } from "../entities/Message";
 import { JOIN_CHANNEL, LEAVE_CHANNEL, NEW_NOTIFICATION } from "../utils/topics";
+import { validateHuman } from "../utils/validateHuman";
 
 @Resolver( UserEntity )
 export class AuthResolver
@@ -40,9 +41,27 @@ export class AuthResolver
         @Arg( 'password' )
         password: string,
         @Ctx()
-        { session }: MyContext
+        { session }: MyContext,
+        @Arg( 'recaptchaToken', { nullable: true } )
+        recaptchaToken?: string
     ): Promise<UserEntity>
     {
+        if ( process.env.NODE_ENV !== 'development' && !recaptchaToken )
+        {
+            throw new ErrorResponse( 'Where is your recaptcha token?', 401 );
+        }
+
+        if ( recaptchaToken )
+        {
+            const isHuman = validateHuman( recaptchaToken );
+            console.log( 'isHuman = ', isHuman );
+
+            if ( !isHuman )
+            {
+                throw new ErrorResponse( 'Are you a robot?', 401 );
+            }
+        }
+
         if ( session.user )
         {
             throw new ErrorResponse( 'Not Authorized', 401 );
@@ -78,9 +97,27 @@ export class AuthResolver
         @Arg( 'password' )
         password: string,
         @Ctx()
-        { session }: MyContext
+        { session }: MyContext,
+        @Arg( 'recaptchaToken', { nullable: true } )
+        recaptchaToken?: string,
     ): Promise<UserEntity>
     {
+        if ( process.env.NODE_ENV !== 'development' && !recaptchaToken )
+        {
+            throw new ErrorResponse( 'Where is your recaptcha token?', 401 );
+        }
+
+        if ( recaptchaToken )
+        {
+            const isHuman = validateHuman( recaptchaToken );
+            console.log( 'isHuman = ', isHuman );
+
+            if ( !isHuman )
+            {
+                throw new ErrorResponse( 'Are you a robot?', 401 );
+            }
+        }
+
         if ( session.user )
         {
             throw new ErrorResponse( 'Not Authorized', 401 );

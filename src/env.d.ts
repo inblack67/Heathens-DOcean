@@ -5,5 +5,6 @@ declare namespace NodeJS {
     CLIENT_URL: string;
     COOKIE_DOMAIN: string;
     NODE_ENV: string;
+    RECAPTCHA_SECRET: string;
   }
 }
