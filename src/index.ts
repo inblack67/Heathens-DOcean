@@ -18,6 +18,7 @@ import { createServer } from 'http';
 import { GraphQLError } from 'graphql';
 import { errorFormatter } from './utils/formatter';
 import { getSchema } from './utils/schema';
+import { ErrorResponse } from './utils/ErrorResponse';
 
 const main = async () =>
 {
@@ -97,6 +98,10 @@ const main = async () =>
         subscriptions: {
             onConnect: ( _, ws: any ) =>
             {
+                if ( ws.upgradeReq.headers.origin !== process.env.CLIENT_URL )
+                {
+                    throw new ErrorResponse( 'Maybe some other time', 401 );
+                }
                 sessionParser( ws.upgradeReq as Request, {} as Response, () =>
                 {
                     if ( !ws.upgradeReq.session.user )
