@@ -54,7 +54,6 @@ export class AuthResolver
         if ( recaptchaToken )
         {
             const isHuman = validateHuman( recaptchaToken );
-            console.log( 'isHuman = ', isHuman );
 
             if ( !isHuman )
             {
@@ -110,7 +109,6 @@ export class AuthResolver
         if ( recaptchaToken )
         {
             const isHuman = validateHuman( recaptchaToken );
-            console.log( 'isHuman = ', isHuman );
 
             if ( !isHuman )
             {

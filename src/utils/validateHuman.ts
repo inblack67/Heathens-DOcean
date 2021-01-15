@@ -9,6 +9,5 @@ export const validateHuman = async ( token: string ) =>
     } );
 
     const data = await res.json();
-    console.log( 'validateHuman data = ', data );
     return data.success;
 };
