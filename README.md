@@ -18,12 +18,17 @@
     - Node.js
     - Express
     - TypeScript
-    - Crypto
     - Redis
+    - Crypto
     - Material-UI
     - Docker
+    - Docker Compose
     - NGINX
+    - Let's Encrypt
+    - SSL
     - DigitalOcean
     - Vercel
-    
-- [Live](https://app.21heathens.tk)
+    - Recaptcha
+    - PWA
+
+- [Deployed](https://app.21heathens.tk)
