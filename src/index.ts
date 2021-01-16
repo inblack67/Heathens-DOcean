@@ -34,7 +34,7 @@ const main = async () => {
         try {
             await createConnection({
                 type: 'postgres',
-                database: 'slack2',
+                database: 'slack',
                 username: process.env.POSTGRES_USER,
                 password: process.env.POSTGRES_PASSWORD,
                 logging: true,
