@@ -70,7 +70,7 @@ const main = async () => {
     });
 
     const sessionParser = session({
-        // proxy: true,
+        proxy: true,
         store: new RedisStore({ client: RedisClient }),
         name: 'ts',
         secret: process.env.SESSION_SECRET,
@@ -79,9 +79,9 @@ const main = async () => {
         cookie: {
             httpOnly: true,
             sameSite: 'lax',
-            // secure: true,
+            secure: true,
             maxAge: 1000 * 60 * 60,
-            // domain: process.env.COOKIE_DOMAIN,
+            domain: process.env.COOKIE_DOMAIN,
         }
     });
 
