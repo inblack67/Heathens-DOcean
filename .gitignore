@@ -3,3 +3,4 @@ pgdata
 .env
 dist
 *.sh
+*.sql

@@ -8,97 +8,86 @@ import { MessageEntity } from "../entities/Message";
 import { getConnection } from "typeorm";
 import { JOIN_CHANNEL, LEAVE_CHANNEL, NEW_MESSAGE, NEW_NOTIFICATION } from "../utils/topics";
 
-@Resolver( ChannelEntity )
-export class ChannelResolver
-{
+@Resolver(ChannelEntity)
+export class ChannelResolver {
 
-    @FieldResolver( () => [ UserEntity ], { nullable: true } )
+    @FieldResolver(() => [ UserEntity ], { nullable: true })
     users (
         @Root()
         channel: ChannelEntity,
         @Ctx()
         { usersLoader }: MyContext,
-    ): Promise<( UserEntity | Error )[]> | []
-    {
-        if ( !channel.userIds )
-        {
+    ): Promise<(UserEntity | Error)[]> | [] {
+        if (!channel.userIds) {
             return [];
         }
-        return usersLoader.loadMany( channel.userIds );
+        return usersLoader.loadMany(channel.userIds);
     }
 
-    @FieldResolver( () => [ MessageEntity ], { nullable: true } )
+    @FieldResolver(() => [ MessageEntity ], { nullable: true })
     messages (
         @Root()
         channel: ChannelEntity,
         @Ctx()
         { messagesLoader }: MyContext,
-    ): Promise<( MessageEntity | Error )[]> | []
-    {
-        if ( !channel.messageIds )
-        {
+    ): Promise<(MessageEntity | Error)[]> | [] {
+        if (!channel.messageIds) {
             return [];
         }
-        return messagesLoader.loadMany( channel.messageIds );
+        return messagesLoader.loadMany(channel.messageIds);
     }
 
-    @UseMiddleware( isAuthenticated )
-    @Query( () => [ ChannelEntity ] )
-    async getChannels (): Promise<ChannelEntity[]>
-    {
+    @UseMiddleware(isAuthenticated)
+    @Query(() => [ ChannelEntity ])
+    async getChannels (): Promise<ChannelEntity[]> {
         const channels = await ChannelEntity.find();
         return channels;
     }
 
-    @UseMiddleware( isAuthenticated )
-    @Query( () => ChannelEntity, { nullable: true } )
+    @UseMiddleware(isAuthenticated)
+    @Query(() => ChannelEntity, { nullable: true })
     async getSingleChannel (
-        @Arg( 'id' )
+        @Arg('id')
         id: number
-    ): Promise<ChannelEntity | undefined>
-    {
-        const channel = await ChannelEntity.findOne( id );
+    ): Promise<ChannelEntity | undefined> {
+        const channel = await ChannelEntity.findOne(id);
 
-        if ( !channel )
-        {
-            throw new ErrorResponse( 'Resource does not exits', 404 );
+        if (!channel) {
+            throw new ErrorResponse('Resource does not exits', 404);
         }
 
         return channel;
     }
 
-    @UseMiddleware( isAuthenticated )
-    @Query( () => [ UserEntity ], { nullable: true } )
+    @UseMiddleware(isAuthenticated)
+    @Query(() => [ UserEntity ], { nullable: true })
     async getChannelUsers (
-        @Arg( 'channelId' )
+        @Arg('channelId')
         channelId: number,
         @Ctx()
         { usersLoader }: MyContext
-    ): Promise<( UserEntity | Error )[]>
-    {
-        const channel = await ChannelEntity.findOne( channelId );
+    ): Promise<(UserEntity | Error)[]> {
+        const channel = await ChannelEntity.findOne(channelId);
 
-        if ( !channel )
-        {
-            throw new ErrorResponse( 'Resource does not exits', 404 );
+        if (!channel) {
+            throw new ErrorResponse('Resource does not exits', 404);
         }
-        return usersLoader.loadMany( channel.userIds );
+        return usersLoader.loadMany(channel.userIds);
     }
 
     @Subscription(
         () => MessageEntity,
         {
             topics: NEW_MESSAGE,
-            filter: ( { payload, args } ) => args.channelId === payload.channelId
+            filter: ({ payload, args }) => args.channelId === payload.channelId
         },
     )
     newMessage (
         @Root()
         payload: MessageEntity,
-        @Arg( 'channelId' )
+        @Arg('channelId')
         _: number
-    ): MessageEntity
-    {
+    ): MessageEntity {
 
         return payload;
     }
@@ -108,16 +97,15 @@ export class ChannelResolver
         {
 
             topics: NEW_NOTIFICATION,
-            filter: ( { payload, args } ) => args.channelId === payload.channelId
+            filter: ({ payload, args }) => args.channelId === payload.channelId
         }
     )
     newNotification (
         @Root()
         payload: any,
-        @Arg( 'channelId' )
+        @Arg('channelId')
         _: number,
-    ): MessageEntity
-    {
+    ): MessageEntity {
         return payload.message;
     }
 
@@ -125,16 +113,15 @@ export class ChannelResolver
         () => UserEntity,
         {
             topics: JOIN_CHANNEL,
-            filter: ( { payload, args } ) => args.channelId === payload.channelId
+            filter: ({ payload, args }) => args.channelId === payload.channelId
         }
     )
     joinedChannel (
         @Root()
         payload: any,
-        @Arg( 'channelId' )
+        @Arg('channelId')
         _: number
-    ): UserEntity
-    {
+    ): UserEntity {
         return payload.user;
     }
 
@@ -142,58 +129,53 @@ export class ChannelResolver
         () => UserEntity,
         {
             topics: LEAVE_CHANNEL,
-            filter: ( { payload, args } ) => args.channelId === payload.channelId
+            filter: ({ payload, args }) => args.channelId === payload.channelId
         }
     )
     leftChannel (
         @Root()
         payload: any,
-        @Arg( 'channelId' )
+        @Arg('channelId')
         _: number
-    ): UserEntity
-    {
+    ): UserEntity {
         return payload.user;
     }
 
-    @UseMiddleware( isAuthenticated, isAdmin )
-    @Mutation( () => ChannelEntity )
+    @UseMiddleware(isAuthenticated, isAdmin)
+    @Mutation(() => ChannelEntity)
     async addChannel (
-        @Arg( 'name' )
+        @Arg('name')
         name: string,
-        @Arg( 'desc' )
+        @Arg('desc')
         desc: string,
-    ): Promise<ChannelEntity>
-    {
-        const newChannel = await ChannelEntity.create( { name, desc } ).save();
+    ): Promise<ChannelEntity> {
+        const newChannel = await ChannelEntity.create({ name, desc }).save();
         return newChannel;
     }
 
-    @UseMiddleware( isAuthenticated, isAdmin )
-    @Mutation( () => Boolean )
+    @UseMiddleware(isAuthenticated, isAdmin)
+    @Mutation(() => Boolean)
     async deleteChannel (
-        @Arg( 'id' )
+        @Arg('id')
         id: number
-    ): Promise<boolean>
-    {
-        const channel = await ChannelEntity.findOne( id );
+    ): Promise<boolean> {
+        const channel = await ChannelEntity.findOne(id);
 
-        if ( !channel )
-        {
-            throw new ErrorResponse( 'Resource does not exits', 404 );
+        if (!channel) {
+            throw new ErrorResponse('Resource does not exits', 404);
         }
 
-        getConnection().transaction( async tn =>
-        {
-            await tn.query( `
+        getConnection().transaction(async tn => {
+            await tn.query(`
                 DELETE FROM message_entity 
                 WHERE "channelId" = ${ channel.id }
             ` );
 
-            await tn.query( `
+            await tn.query(`
                 DELETE FROM channel_entity
                 WHERE id = ${ channel.id }
             `);
-        } );
+        });
 
         return true;
     }
