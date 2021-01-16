@@ -24,8 +24,6 @@ services:
       - db
       - redis
     environment:
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_USER: postgres
       DB_HOST: db
       REDIS_HOST: redis
     env_file: 
