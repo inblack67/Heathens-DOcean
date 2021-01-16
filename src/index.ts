@@ -19,6 +19,7 @@ import { GraphQLError } from 'graphql';
 import { errorFormatter } from './utils/formatter';
 import { getSchema } from './utils/schema';
 import { ErrorResponse } from './utils/ErrorResponse';
+import { isProd } from './utils/constants';
 
 const main = async () => {
     dotenv.config();
@@ -70,7 +71,7 @@ const main = async () => {
     });
 
     const sessionParser = session({
-        proxy: true,
+        proxy: isProd(),
         store: new RedisStore({ client: RedisClient }),
         name: 'ts',
         secret: process.env.SESSION_SECRET,
@@ -79,9 +80,9 @@ const main = async () => {
         cookie: {
             httpOnly: true,
             sameSite: 'lax',
-            secure: true,
+            secure: isProd(),
             maxAge: 1000 * 60 * 60,
-            domain: process.env.COOKIE_DOMAIN,
+            domain: isProd() ? process.env.COOKIE_DOMAIN : undefined,
         }
     });
 
@@ -106,7 +107,7 @@ const main = async () => {
             const customError = errorFormatter(err);
             return customError;
         },
-        playground: true,
+        playground: !isProd(),
     });
 
     apolloServer.installSubscriptionHandlers(ws);
