@@ -14,6 +14,10 @@ export class MessageEntity extends BaseEntity {
     @Column()
     content!: string;
 
+    @Field(() => String)
+    @Column()
+    ivString!: string;
+
     @Column('text', { default: true })
     @Field()
     type: string = 'text';

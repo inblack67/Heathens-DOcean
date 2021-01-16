@@ -7,6 +7,8 @@ import { ChannelEntity } from "../entities/Channel";
 import { UserEntity } from "../entities/User";
 import { getConnection } from "typeorm";
 import { NEW_MESSAGE } from "../utils/topics";
+import { decryptMe, encryptMe } from "../utils/encryption";
+import crypto from 'crypto';
 
 @Resolver(MessageEntity)
 export class MessageResolver {
@@ -50,7 +52,11 @@ export class MessageResolver {
         if (!channel.userIds || !channel.userIds.includes(session.user as number)) {
             throw new ErrorResponse('You must join the channel first', 404);
         }
-        const newMessage = await MessageEntity.create({ content, posterId: session.user as number, channelId }).save();
+
+        const iv = crypto.randomBytes(16);
+        var ivString = iv.toString('hex').slice(0, 16);
+        const encryptedMessage = encryptMe(content, ivString);
+        const newMessage = await MessageEntity.create({ content: encryptedMessage, posterId: session.user as number, channelId, ivString }).save();
         await getConnection().query((`
                 UPDATE channel_entity
                 SET "messageIds" = "messageIds" || ${ newMessage.id }
@@ -77,7 +83,11 @@ export class MessageResolver {
         if (!channel.userIds.includes(session.user as number)) {
             throw new ErrorResponse('You have to join the channel first', 401);
         }
-        const messages = MessageEntity.find({ channelId });
+        const messages = await MessageEntity.find({ channelId });
+
+        messages.forEach(mess => {
+            mess.content = decryptMe(mess.content, mess.ivString);
+        });
 
         return messages;
     }
