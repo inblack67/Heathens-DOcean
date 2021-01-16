@@ -6,7 +6,7 @@ import { MyContext } from "../utils/types";
 import { UserEntity } from "../entities/User";
 import { MessageEntity } from "../entities/Message";
 import { getConnection } from "typeorm";
-import { JOIN_CHANNEL, LEAVE_CHANNEL, NEW_MESSAGE, NEW_NOTIFICATION } from "../utils/topics";
+import { JOIN_CHANNEL, LEAVE_CHANNEL, NEW_MESSAGE, NEW_NOTIFICATION, REMOVED_MESSAGE } from "../utils/topics";
 
 @Resolver(ChannelEntity)
 export class ChannelResolver {
@@ -83,6 +83,23 @@ export class ChannelResolver {
         },
     )
     newMessage (
+        @Root()
+        payload: MessageEntity,
+        @Arg('channelId')
+        _: number
+    ): MessageEntity {
+
+        return payload;
+    }
+
+    @Subscription(
+        () => MessageEntity,
+        {
+            topics: REMOVED_MESSAGE,
+            filter: ({ payload, args }) => args.channelId === payload.channelId
+        },
+    )
+    removedMessage (
         @Root()
         payload: MessageEntity,
         @Arg('channelId')

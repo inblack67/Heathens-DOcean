@@ -6,7 +6,7 @@ import { MyContext } from "../utils/types";
 import { ChannelEntity } from "../entities/Channel";
 import { UserEntity } from "../entities/User";
 import { getConnection } from "typeorm";
-import { NEW_MESSAGE } from "../utils/topics";
+import { NEW_MESSAGE, REMOVED_MESSAGE } from "../utils/topics";
 import { decryptMe, encryptMe } from "../utils/encryption";
 import crypto from 'crypto';
 
@@ -98,7 +98,9 @@ export class MessageResolver {
         @Arg('id')
         id: number,
         @Ctx()
-        { session }: MyContext
+        { session }: MyContext,
+        @PubSub()
+        pubsub: PubSubEngine
     ): Promise<boolean> {
         const message = await MessageEntity.findOne(id);
 
@@ -130,6 +132,8 @@ export class MessageResolver {
             `);
 
         });
+        await pubsub.publish(REMOVED_MESSAGE, message);
+
         return true;
     }
 }
