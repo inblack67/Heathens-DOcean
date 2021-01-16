@@ -6,14 +6,14 @@ services:
       - webnet
   db:
     image: postgres
+    ports:
+      - "3030:5432"
     volumes: 
       - ./pgdata:/var/lib/postgresql/data
     networks: 
       - webnet
-    environment:
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_USER: postgres
-      POSTGRES_DB: slack
+    env_file: 
+      - .env
   web:
     image: inblack67/slack:latest
     ports: 
