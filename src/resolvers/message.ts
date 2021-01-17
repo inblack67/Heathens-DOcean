@@ -50,14 +50,17 @@ export class MessageResolver {
         if (!channel) {
             throw new ErrorResponse('Resource does not exits', 404);
         }
-        if (!channel.userIds || !channel.userIds.includes(session.user as number)) {
+
+        const userId = session.user!.id;
+
+        if (!channel.userIds || !channel.userIds.includes(userId)) {
             throw new ErrorResponse('You must join the channel first', 404);
         }
 
         const iv = crypto.randomBytes(16);
         var ivString = iv.toString('hex').slice(0, 16);
         const encryptedMessage = encryptMe(content, ivString);
-        const newMessage = await MessageEntity.create({ content: encryptedMessage, posterId: session.user as number, channelId, ivString }).save();
+        const newMessage = await MessageEntity.create({ content: encryptedMessage, posterId: userId, channelId, ivString }).save();
         await getConnection().query((`
                 UPDATE channel_entity
                 SET "messageIds" = "messageIds" || ${ newMessage.id }
@@ -81,7 +84,8 @@ export class MessageResolver {
         if (!channel) {
             throw new ErrorResponse('Channel does not exists', 401);
         }
-        if (!channel.userIds.includes(session.user as number)) {
+        const userId = session.user!.id;
+        if (!channel.userIds.includes(userId)) {
             throw new ErrorResponse('You have to join the channel first', 401);
         }
         const messages = await MessageEntity.find({ channelId });
@@ -111,7 +115,9 @@ export class MessageResolver {
             throw new ErrorResponse('Resource does not exits', 404);
         }
 
-        if (message.posterId !== session.user) {
+        const userId = session.user!.id;
+
+        if (message.posterId !== userId) {
             throw new ErrorResponse('Not Authorized', 400);
         }
 

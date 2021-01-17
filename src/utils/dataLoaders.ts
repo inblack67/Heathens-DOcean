@@ -2,6 +2,8 @@ import DataLoader from 'dataloader';
 import { ChannelEntity } from '../entities/Channel';
 import { MessageEntity } from '../entities/Message';
 import { UserEntity } from '../entities/User';
+import { decryptMe } from './encryption';
+import { customSort } from './utilities';
 
 export const channelLoader = () => new DataLoader<number, ChannelEntity>(async (ids) => {
     const channels = await ChannelEntity.findByIds(ids as number[]);
@@ -13,8 +15,14 @@ export const channelLoader = () => new DataLoader<number, ChannelEntity>(async (
 
 export const messagesLoader = () => new DataLoader<number, MessageEntity>(async (ids) => {
     const messages = await MessageEntity.findByIds(ids as number[]);
+    const sortedMessages = customSort<MessageEntity[]>(messages) as MessageEntity[];
+
+    sortedMessages.forEach(mess => {
+        mess.content = decryptMe(mess.content, mess.ivString);
+    });
+
     const messagesWithIds: Record<number, MessageEntity> = {};
-    messages.forEach(message => messagesWithIds[ message.id ] = message);
+    sortedMessages.forEach(message => messagesWithIds[ message.id ] = message);
     return ids.map(id => messagesWithIds[ id ]);
 });
 

@@ -13,15 +13,6 @@ import { validateHuman } from "../utils/validateHuman";
 @Resolver(UserEntity)
 export class AuthResolver {
 
-    @UseMiddleware(isAuthenticated)
-    @Query(() => UserEntity)
-    getSingleUser (
-        @Arg('id')
-        id: number
-    ): Promise<UserEntity | undefined> {
-        return UserEntity.findOne(id);
-    }
-
     @Mutation(() => UserEntity)
     async registerUser (
         @Arg('username')
@@ -58,8 +49,7 @@ export class AuthResolver {
         try {
             const isAdmin = username === 'inblack1967';
             const newUser = await UserEntity.create({ name, email, password: hashedPassword, username, role: isAdmin ? 'admin' : 'user' }).save();
-            session.user = newUser.id;
-            session.username = newUser.username;
+            session.user = newUser;
             return newUser;
         } catch (err) {
             console.error(err);
@@ -112,9 +102,7 @@ export class AuthResolver {
             throw new ErrorResponse('Invalid Credentials', 401);
         }
 
-        session.user = user.id;
-        session.username = user.username;
-
+        session.user = user;
         return user;
     }
 
@@ -124,7 +112,7 @@ export class AuthResolver {
         @Ctx()
         { session }: MyContext
     ): Promise<UserEntity> {
-        const user = await UserEntity.findOne(session.user);
+        const user = session.user;
         return user!;
     }
 
@@ -136,23 +124,18 @@ export class AuthResolver {
         @PubSub()
         pubsub: PubSubEngine
     ): Promise<boolean> {
-        const userId = parseInt(session.user as string);
+        const userId = session.user!.id;
 
-        const user = await UserEntity.findOne(userId);
-
-        const hasChannel = user!.channelId !== undefined && user!.channelId !== null;
-        const channelId = user!.channelId;
+        const hasChannel = session.user!.channelId !== undefined && session.user!.channelId !== null;
+        const channelId = session.user!.channelId;
 
         if (hasChannel) {
-            pubsub.publish(NEW_NOTIFICATION, { message: `${ session.username } has left`, channelId: channelId });
-        }
-
-        await UserEntity.update({ id: userId }, { channelId: undefined });
-
-        if (hasChannel) {
+            pubsub.publish(NEW_NOTIFICATION, { message: `${ session.user!.username } has left`, channelId: channelId });
+            await UserEntity.update({ id: userId }, { channelId: undefined });
             const updatedUser = await UserEntity.findOne(userId);
             pubsub.publish(LEAVE_CHANNEL, { user: updatedUser, channelId });
         }
+
 
         await getConnection().query((`
                 UPDATE channel_entity SET "userIds" = (SELECT ARRAY(SELECT UNNEST("userIds")
@@ -180,8 +163,7 @@ export class AuthResolver {
         @PubSub()
         pubsub: PubSubEngine
     ): Promise<boolean> {
-        const user = await UserEntity.findOne(session.user);
-
+        const user = session.user;
         if (user!.channelId) {
             throw new ErrorResponse('One channel at a time.', 401);
         }
@@ -192,21 +174,29 @@ export class AuthResolver {
             throw new ErrorResponse('Channel does not exist', 404);
         }
 
-        if (channel.userIds && channel.userIds.includes(session.user as number)) {
+        if (channel.userIds && channel.userIds.includes(user!.id)) {
             throw new ErrorResponse('You have already joined', 404);
         }
 
-        await getConnection().query((`
+        await getConnection().transaction(async tn => {
+            await tn.query(`
                 UPDATE channel_entity
-                SET "userIds" = "userIds" || ${ session.user }
+                SET "userIds" = "userIds" || ${ user!.id }
                 WHERE id = ${ channelId };
-            `));
+            `);
 
-        pubsub.publish(NEW_NOTIFICATION, { message: `${ session.username } has joined`, channelId: channel.id });
+            await tn.query(`
+                UPDATE user_entity
+                SET "channelId" = ${ channelId }
+                WHERE id = ${ user!.id }
+            `);
+        });
 
-        await UserEntity.update({ id: session.user as number }, { channelId });
+        pubsub.publish(NEW_NOTIFICATION, { message: `${ user!.username } has joined`, channelId: channel.id });
 
-        const updatedUser = await UserEntity.findOne(session.user);
+        const updatedUser = await UserEntity.findOne(user!.id);
+
+        session.user!.channelId = channelId;
 
         pubsub.publish(JOIN_CHANNEL, { user: updatedUser, channelId });
 
@@ -219,7 +209,7 @@ export class AuthResolver {
         @Ctx()
         { session }: MyContext,
     ): Promise<ChannelEntity> {
-        const user = await UserEntity.findOne(session.user);
+        const user = session.user;
         if (!user!.channelId) {
             throw new ErrorResponse('None joined', 401);
         }
@@ -237,7 +227,7 @@ export class AuthResolver {
         @PubSub()
         pubsub: PubSubEngine
     ): Promise<boolean> {
-        const user = await UserEntity.findOne(session.user);
+        const user = session.user;
 
         if (!user!.channelId) {
             throw new ErrorResponse('Join some channel first', 401);
@@ -248,41 +238,44 @@ export class AuthResolver {
             throw new ErrorResponse('Channel does not exists', 404);
         }
 
-        if (channel.userIds && !channel.userIds.includes(session.user as number)) {
+        if (channel.userIds && !channel.userIds.includes(user!.id)) {
             throw new ErrorResponse('You have already left', 404);
         }
 
-        const userId = parseInt(session.user as string);
+        const userId = user!.id;
 
-        await getConnection().query((`
+        await getConnection().transaction(async tn => {
+            await tn.query(`
                 UPDATE channel_entity SET "userIds" = (SELECT ARRAY(SELECT UNNEST("userIds")
                 EXCEPT
                 SELECT UNNEST(ARRAY[${ userId }])));
-            `));
+            `);
+            await tn.query(`
+                UPDATE user_entity
+                SET "channelId" = NULL
+                WHERE id = ${ userId }
+            `);
+        });
 
-        await UserEntity.update({ id: userId }, { channelId: undefined });
+        const updatedUser = await UserEntity.findOne(user!.id);
 
-        const updatedUser = await UserEntity.findOne(session.user);
+        session.user = updatedUser;
+        console.log('test==== = ', updatedUser);
 
-        pubsub.publish(NEW_NOTIFICATION, { message: `${ session.username } has left`, channelId: channel.id });
+        pubsub.publish(NEW_NOTIFICATION, { message: `${ updatedUser?.username } has left`, channelId: channel.id });
         pubsub.publish(LEAVE_CHANNEL, { user: updatedUser, channelId });
 
         return true;
     }
 
+    @UseMiddleware(isAuthenticated)
     @Mutation(() => Boolean)
     async deleteUser (
         @Ctx()
         { session }: MyContext
     ): Promise<boolean> {
 
-        const user = await UserEntity.findOne(session.user);
-
-        if (!user) {
-            throw new ErrorResponse('Resource does not exits', 404);
-        }
-
-        const userId = parseInt(session.user as string);
+        const userId = session.user!.id;
 
         const messages = await MessageEntity.find({ posterId: userId });
 
@@ -296,12 +289,16 @@ export class AuthResolver {
             `);
 
             await tn.query(`
-                DELETE from message_entity
+                DELETE FROM message_entity
                 WHERE "posterId" = ${ userId };
             `);
-        });
 
-        await UserEntity.delete({ id: session.user as any });
+            await tn.query(`
+                DELETE FROM user_entity
+                WHERE id = ${ userId }
+            `);
+
+        });
 
         session.destroy(err => {
             if (err) {
