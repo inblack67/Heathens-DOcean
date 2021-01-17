@@ -60,10 +60,22 @@ const main = async () => {
     app.set('trust proxy', 1);
 
     app.use(cors({
-        origin: process.env.CLIENT_URL,
+        origin: (origin, cb) => {
+            if (!origin || origin !== process.env.CLIENT_URL) {
+                cb(new ErrorResponse('Maybe some other time', 401), false);
+            } else {
+                cb(null, true);
+            }
+        },
         credentials: true,
         optionsSuccessStatus: 200
     }));
+
+    // app.use(cors({
+    //     origin: process.env.CLIENT_URL,
+    //     credentials: true,
+    //     optionsSuccessStatus: 200
+    // }));
 
     app.get('/', (_: Request, res: Response) => {
         res.send('API up and runnin');
@@ -93,11 +105,12 @@ const main = async () => {
         context: ({ req, res }): MyContext => ({ req, res, session: req?.session, usersLoader: usersLoader(), messagesLoader: messagesLoader(), channelLoader: channelLoader(), pubsub: createPubSub() }),
         subscriptions: {
             onConnect: (_, ws: any) => {
-                if (ws.upgradeReq.headers.origin !== process.env.CLIENT_URL) {
+                if (!ws.upgradeReq.headers.origin || ws.upgradeReq.headers.origin !== process.env.CLIENT_URL) {
                     throw new ErrorResponse('Maybe some other time', 401);
                 }
                 sessionParser(ws.upgradeReq as Request, {} as Response, () => {
                     if (!ws.upgradeReq.session.user) {
+                        // yet to be reasearched
                         // throw new ErrorResponse( 'Not Authorized For Subscriptions!', 401 );
                     }
                 });
