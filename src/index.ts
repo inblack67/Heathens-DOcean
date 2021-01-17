@@ -20,6 +20,10 @@ import { errorFormatter } from './utils/formatter';
 import { getSchema } from './utils/schema';
 import { ErrorResponse } from './utils/ErrorResponse';
 import { isProd } from './utils/constants';
+import queryComplexity, {
+    fieldExtensionsEstimator,
+    simpleEstimator
+} from "graphql-query-complexity";
 
 const main = async () => {
     dotenv.config();
@@ -60,22 +64,16 @@ const main = async () => {
     app.set('trust proxy', 1);
 
     app.use(cors({
-        origin: (origin, cb) => {
+        origin: isProd() ? (origin, cb) => {
             if (!origin || origin !== process.env.CLIENT_URL) {
                 cb(new ErrorResponse('Maybe some other time', 401), false);
             } else {
                 cb(null, true);
             }
-        },
+        } : process.env.CLIENT_URL,
         credentials: true,
         optionsSuccessStatus: 200
     }));
-
-    // app.use(cors({
-    //     origin: process.env.CLIENT_URL,
-    //     credentials: true,
-    //     optionsSuccessStatus: 200
-    // }));
 
     app.get('/', (_: Request, res: Response) => {
         res.send('API up and runnin');
@@ -121,6 +119,26 @@ const main = async () => {
             return customError;
         },
         playground: !isProd(),
+        validationRules: [
+            queryComplexity({
+                maximumComplexity: +process.env.QUERY_LIMIT,
+                variables: {},
+                onComplete: (complexity: number) => {
+                    if (complexity <= +process.env.QUERY_LIMIT) {
+                        console.log(`Query Complexity = ${ complexity }`.green.bold);
+                    } else {
+                        console.log(`FATAL - Query Complexity = ${ complexity }`.red.bold);
+                    }
+                },
+                estimators: [
+                    // Using fieldConfigEstimator is mandatory to make it work with type-graphql
+                    fieldExtensionsEstimator(),
+                    simpleEstimator({
+                        defaultComplexity: 1
+                    })
+                ]
+            }) as any
+        ]
     });
 
     apolloServer.installSubscriptionHandlers(ws);
