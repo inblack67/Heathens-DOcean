@@ -9,6 +9,7 @@ import { getConnection } from "typeorm";
 import { NEW_MESSAGE, REMOVED_MESSAGE } from "../utils/topics";
 import { decryptMe, encryptMe } from "../utils/encryption";
 import crypto from 'crypto';
+import { customSort } from "../utils/utilities";
 
 @Resolver(MessageEntity)
 export class MessageResolver {
@@ -85,11 +86,13 @@ export class MessageResolver {
         }
         const messages = await MessageEntity.find({ channelId });
 
-        messages.forEach(mess => {
+        const sortedMessages = customSort<MessageEntity[]>(messages) as MessageEntity[];
+
+        sortedMessages.forEach(mess => {
             mess.content = decryptMe(mess.content, mess.ivString);
         });
 
-        return messages;
+        return sortedMessages;
     }
 
     @UseMiddleware(isAuthenticated)

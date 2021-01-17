@@ -12,11 +12,6 @@ import { validateHuman } from "../utils/validateHuman";
 
 @Resolver(UserEntity)
 export class AuthResolver {
-    // @UseMiddleware( isAuthenticated )
-    @Query(() => [ UserEntity ])
-    getUsers (): Promise<UserEntity[]> {
-        return UserEntity.find();
-    }
 
     @UseMiddleware(isAuthenticated)
     @Query(() => UserEntity)

@@ -7,6 +7,7 @@ import { UserEntity } from "../entities/User";
 import { MessageEntity } from "../entities/Message";
 import { getConnection } from "typeorm";
 import { JOIN_CHANNEL, LEAVE_CHANNEL, NEW_MESSAGE, NEW_NOTIFICATION, REMOVED_MESSAGE } from "../utils/topics";
+import { customSort } from "../utils/utilities";
 
 @Resolver(ChannelEntity)
 export class ChannelResolver {
@@ -41,7 +42,8 @@ export class ChannelResolver {
     @Query(() => [ ChannelEntity ], {})
     async getChannels (): Promise<ChannelEntity[]> {
         const channels = await ChannelEntity.find();
-        return channels;
+        const sortedChannels = customSort<ChannelEntity[]>(channels) as ChannelEntity[];
+        return sortedChannels;
     }
 
     @UseMiddleware(isAuthenticated)
