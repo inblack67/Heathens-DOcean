@@ -21,6 +21,7 @@ import { getSchema } from './utils/schema';
 import { ErrorResponse } from './utils/ErrorResponse';
 import { isProd } from './utils/constants';
 import { fieldExtensionsEstimator, getComplexity, simpleEstimator } from 'graphql-query-complexity';
+import { populateRedis } from './utils/populate';
 
 const main = async () => {
     dotenv.config();
@@ -29,6 +30,9 @@ const main = async () => {
         host: process.env.REDIS_HOST,
         port: 6379
     });
+
+    await RedisClient.flushall();
+
     const RedisStore = connectRedis(session);
 
     let retries = 20;
@@ -96,6 +100,9 @@ const main = async () => {
     });
 
     app.use(sessionParser);
+
+    // populating redis
+    populateRedis(RedisClient);
 
     const apolloServer = new ApolloServer({
         schema,
