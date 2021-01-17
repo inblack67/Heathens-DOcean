@@ -12,7 +12,7 @@ import crypto from 'crypto';
 
 @Resolver(MessageEntity)
 export class MessageResolver {
-    @FieldResolver(() => ChannelEntity)
+    @FieldResolver(() => ChannelEntity, {})
     channel (
         @Root()
         message: MessageEntity,
@@ -22,7 +22,7 @@ export class MessageResolver {
         return channelLoader.load(message.channelId);
     }
 
-    @FieldResolver(() => UserEntity)
+    @FieldResolver(() => UserEntity, {})
     poster (
         @Root()
         message: MessageEntity,
@@ -34,7 +34,7 @@ export class MessageResolver {
 
 
     @UseMiddleware(isAuthenticated)
-    @Mutation(() => MessageEntity)
+    @Mutation(() => MessageEntity, {})
     async postMessage (
         @Arg('content')
         content: string,
@@ -69,7 +69,7 @@ export class MessageResolver {
     }
 
     @UseMiddleware(isAuthenticated)
-    @Query(() => [ MessageEntity ])
+    @Query(() => [ MessageEntity ], {})
     async getChannelMessages (
         @Arg('channelId')
         channelId: number,
@@ -93,7 +93,7 @@ export class MessageResolver {
     }
 
     @UseMiddleware(isAuthenticated)
-    @Mutation(() => Boolean)
+    @Mutation(() => Boolean, {})
     async deleteMessage (
         @Arg('id')
         id: number,

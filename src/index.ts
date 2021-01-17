@@ -20,10 +20,7 @@ import { errorFormatter } from './utils/formatter';
 import { getSchema } from './utils/schema';
 import { ErrorResponse } from './utils/ErrorResponse';
 import { isProd } from './utils/constants';
-import queryComplexity, {
-    fieldExtensionsEstimator,
-    simpleEstimator
-} from "graphql-query-complexity";
+import { fieldExtensionsEstimator, getComplexity, simpleEstimator } from 'graphql-query-complexity';
 
 const main = async () => {
     dotenv.config();
@@ -80,6 +77,8 @@ const main = async () => {
         res.end();
     });
 
+    const schema = await getSchema();
+
     const sessionParser = session({
         proxy: isProd(),
         store: new RedisStore({ client: RedisClient }),
@@ -99,7 +98,7 @@ const main = async () => {
     app.use(sessionParser);
 
     const apolloServer = new ApolloServer({
-        schema: await getSchema(),
+        schema,
         context: ({ req, res }): MyContext => ({ req, res, session: req?.session, usersLoader: usersLoader(), messagesLoader: messagesLoader(), channelLoader: channelLoader(), pubsub: createPubSub() }),
         subscriptions: {
             onConnect: (_, ws: any) => {
@@ -119,26 +118,30 @@ const main = async () => {
             return customError;
         },
         playground: !isProd(),
-        validationRules: [
-            queryComplexity({
-                maximumComplexity: +process.env.QUERY_LIMIT,
-                variables: {},
-                onComplete: (complexity: number) => {
-                    if (complexity <= +process.env.QUERY_LIMIT) {
-                        console.log(`Query Complexity = ${ complexity }`.green.bold);
-                    } else {
-                        console.log(`FATAL - Query Complexity = ${ complexity }`.red.bold);
-                    }
-                },
-                estimators: [
-                    // Using fieldConfigEstimator is mandatory to make it work with type-graphql
-                    fieldExtensionsEstimator(),
-                    simpleEstimator({
-                        defaultComplexity: 1
-                    })
-                ]
-            }) as any
-        ]
+        plugins: [
+            {
+                requestDidStart: () => ({
+                    didResolveOperation ({ request, document }) {
+                        const complexity = getComplexity({
+                            schema,
+                            operationName: request.operationName,
+                            query: document,
+                            variables: request.variables,
+                            estimators: [
+                                fieldExtensionsEstimator(),
+                                simpleEstimator({ defaultComplexity: 1 }),
+                            ],
+                        });
+                        if (complexity <= +process.env.QUERY_LIMIT) {
+                            console.log(`Query Complexity = ${ complexity }`.green.bold);
+                        } else {
+                            console.log(`FATAL Query Complexity = ${ complexity }`.red.bold);
+                            throw new ErrorResponse('Too Complex', 401);
+                        }
+                    },
+                }),
+            },
+        ],
     });
 
     apolloServer.installSubscriptionHandlers(ws);

@@ -11,7 +11,7 @@ import { JOIN_CHANNEL, LEAVE_CHANNEL, NEW_MESSAGE, NEW_NOTIFICATION, REMOVED_MES
 @Resolver(ChannelEntity)
 export class ChannelResolver {
 
-    @FieldResolver(() => [ UserEntity ], { nullable: true })
+    @FieldResolver(() => [ UserEntity ], { nullable: true, })
     users (
         @Root()
         channel: ChannelEntity,
@@ -24,7 +24,7 @@ export class ChannelResolver {
         return usersLoader.loadMany(channel.userIds);
     }
 
-    @FieldResolver(() => [ MessageEntity ], { nullable: true })
+    @FieldResolver(() => [ MessageEntity ], { nullable: true, })
     messages (
         @Root()
         channel: ChannelEntity,
@@ -38,14 +38,14 @@ export class ChannelResolver {
     }
 
     @UseMiddleware(isAuthenticated)
-    @Query(() => [ ChannelEntity ])
+    @Query(() => [ ChannelEntity ], {})
     async getChannels (): Promise<ChannelEntity[]> {
         const channels = await ChannelEntity.find();
         return channels;
     }
 
     @UseMiddleware(isAuthenticated)
-    @Query(() => ChannelEntity, { nullable: true })
+    @Query(() => ChannelEntity, { nullable: true, })
     async getSingleChannel (
         @Arg('id')
         id: number
@@ -60,7 +60,7 @@ export class ChannelResolver {
     }
 
     @UseMiddleware(isAuthenticated)
-    @Query(() => [ UserEntity ], { nullable: true })
+    @Query(() => [ UserEntity ], { nullable: true, })
     async getChannelUsers (
         @Arg('channelId')
         channelId: number,
@@ -79,7 +79,8 @@ export class ChannelResolver {
         () => MessageEntity,
         {
             topics: NEW_MESSAGE,
-            filter: ({ payload, args }) => args.channelId === payload.channelId
+            filter: ({ payload, args }) => args.channelId === payload.channelId,
+
         },
     )
     newMessage (
@@ -96,7 +97,8 @@ export class ChannelResolver {
         () => MessageEntity,
         {
             topics: REMOVED_MESSAGE,
-            filter: ({ payload, args }) => args.channelId === payload.channelId
+            filter: ({ payload, args }) => args.channelId === payload.channelId,
+
         },
     )
     removedMessage (
@@ -114,7 +116,8 @@ export class ChannelResolver {
         {
 
             topics: NEW_NOTIFICATION,
-            filter: ({ payload, args }) => args.channelId === payload.channelId
+            filter: ({ payload, args }) => args.channelId === payload.channelId,
+
         }
     )
     newNotification (
@@ -130,7 +133,8 @@ export class ChannelResolver {
         () => UserEntity,
         {
             topics: JOIN_CHANNEL,
-            filter: ({ payload, args }) => args.channelId === payload.channelId
+            filter: ({ payload, args }) => args.channelId === payload.channelId,
+
         }
     )
     joinedChannel (
@@ -146,7 +150,8 @@ export class ChannelResolver {
         () => UserEntity,
         {
             topics: LEAVE_CHANNEL,
-            filter: ({ payload, args }) => args.channelId === payload.channelId
+            filter: ({ payload, args }) => args.channelId === payload.channelId,
+
         }
     )
     leftChannel (
@@ -159,7 +164,7 @@ export class ChannelResolver {
     }
 
     @UseMiddleware(isAuthenticated, isAdmin)
-    @Mutation(() => ChannelEntity)
+    @Mutation(() => ChannelEntity, {})
     async addChannel (
         @Arg('name')
         name: string,
@@ -171,7 +176,7 @@ export class ChannelResolver {
     }
 
     @UseMiddleware(isAuthenticated, isAdmin)
-    @Mutation(() => Boolean)
+    @Mutation(() => Boolean, {})
     async deleteChannel (
         @Arg('id')
         id: number
