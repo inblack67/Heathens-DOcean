@@ -15,7 +15,7 @@ export const channelLoader = () => new DataLoader<number, ChannelEntity>(async (
 
 export const messagesLoader = () => new DataLoader<number, MessageEntity>(async (ids) => {
     const messages = await MessageEntity.findByIds(ids as number[]);
-    const sortedMessages = customSort<MessageEntity[]>(messages) as MessageEntity[];
+    const sortedMessages = customSort<MessageEntity[]>(messages, 'asc') as MessageEntity[];
 
     sortedMessages.forEach(mess => {
         mess.content = decryptMe(mess.content, mess.ivString);
