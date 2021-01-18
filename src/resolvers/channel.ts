@@ -82,12 +82,16 @@ export class ChannelResolver {
         @Arg('channelId')
         channelId: number,
         @Ctx()
-        { usersLoader, redis }: MyContext
+        { usersLoader, redis, session }: MyContext
     ): Promise<(UserEntity | Error)[]> {
 
         const redChannel = await redis.get(`${ RED_SINGLE_CHANNEL }:${ channelId }`);
 
         const channel = redChannel ? parse(redChannel) : await ChannelEntity.findOne(channelId);
+
+        if (!channel.userIds.includes(session.user!.id)) {
+            throw new ErrorResponse('You have to join the channel first', 401);
+        }
 
         if (!channel) {
             throw new ErrorResponse('Resource does not exits', 404);
