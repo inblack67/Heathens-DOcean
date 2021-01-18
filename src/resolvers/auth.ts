@@ -131,19 +131,26 @@ export class AuthResolver {
         const hasChannel = session.user!.channelId !== undefined && session.user!.channelId !== null;
         const channelId = session.user!.channelId;
 
+        await getConnection().query((`
+            UPDATE channel_entity SET "userIds" = (SELECT ARRAY(SELECT UNNEST("userIds")
+            EXCEPT
+            SELECT UNNEST(ARRAY[${ userId }])));
+        `));
+
         if (hasChannel) {
-            pubsub.publish(NEW_NOTIFICATION, { message: `${ session.user!.username } has left`, channelId: channelId });
+            const updatedChannel = await ChannelEntity.findOne(userId);
             await UserEntity.update({ id: userId }, { channelId: undefined });
             const updatedUser = await UserEntity.findOne(userId);
+            const oldRedChannel = await redis.get(`${ RED_SINGLE_CHANNEL }:${ channelId }`);
+            if (oldRedChannel) {
+                await redis.del(`${ RED_SINGLE_CHANNEL }:${ channelId }`);
+                await redis.set(`${ RED_SINGLE_CHANNEL }:${ channelId }`, stringify(updatedChannel));
+            }
+            pubsub.publish(NEW_NOTIFICATION, { message: `${ session.user!.username } has left`, channelId: channelId });
             pubsub.publish(LEAVE_CHANNEL, { user: updatedUser, channelId });
         }
 
-
-        await getConnection().query((`
-                UPDATE channel_entity SET "userIds" = (SELECT ARRAY(SELECT UNNEST("userIds")
-                EXCEPT
-                SELECT UNNEST(ARRAY[${ userId }])));
-            `));
+        await redis.del(RED_CURRENT_CHANNEL);
 
         session.destroy(err => {
             if (err) {
@@ -151,8 +158,6 @@ export class AuthResolver {
                 console.error(err);
             }
         });
-
-        await redis.flushall();
 
         return true;
     }
@@ -338,14 +343,14 @@ export class AuthResolver {
             }
         }
 
+        await redis.del(RED_CURRENT_CHANNEL);
+
         session.destroy(err => {
             if (err) {
                 console.log(`Session destruction error:`.red.bold);
                 console.error(err);
             }
         });
-
-        await redis.flushall();
 
         return true;
     }
