@@ -9,6 +9,8 @@ import { getConnection } from "typeorm";
 import { MessageEntity } from "../entities/Message";
 import { JOIN_CHANNEL, LEAVE_CHANNEL, NEW_NOTIFICATION } from "../utils/topics";
 import { validateHuman } from "../utils/validateHuman";
+import { RED_CURRENT_CHANNEL } from "../utils/redisKeys";
+import { stringify, parse } from 'flatted';
 
 @Resolver(UserEntity)
 export class AuthResolver {
@@ -120,7 +122,7 @@ export class AuthResolver {
     @Mutation(() => Boolean)
     async logoutUser (
         @Ctx()
-        { session }: MyContext,
+        { session, redis }: MyContext,
         @PubSub()
         pubsub: PubSubEngine
     ): Promise<boolean> {
@@ -150,6 +152,8 @@ export class AuthResolver {
             }
         });
 
+        await redis.flushall();
+
         return true;
     }
 
@@ -157,18 +161,23 @@ export class AuthResolver {
     @Mutation(() => Boolean)
     async joinChannel (
         @Ctx()
-        { session }: MyContext,
+        { session, redis }: MyContext,
         @Arg('channelId')
         channelId: number,
         @PubSub()
         pubsub: PubSubEngine
     ): Promise<boolean> {
+
+
         const user = session.user;
+
         if (user!.channelId) {
             throw new ErrorResponse('One channel at a time.', 401);
         }
 
         const channel = await ChannelEntity.findOne(channelId);
+
+        await redis.set(RED_CURRENT_CHANNEL, stringify(channel));
 
         if (!channel) {
             throw new ErrorResponse('Channel does not exist', 404);
@@ -207,21 +216,22 @@ export class AuthResolver {
     @Query(() => ChannelEntity)
     async getMyChannel (
         @Ctx()
-        { session }: MyContext,
+        { session, redis }: MyContext,
     ): Promise<ChannelEntity> {
         const user = session.user;
         if (!user!.channelId) {
             throw new ErrorResponse('None joined', 401);
         }
-        const channel = await ChannelEntity.findOne(user!.channelId);
-        return channel!;
+        const redChannel = await redis.get(RED_CURRENT_CHANNEL);
+        const parsedChannel = parse(redChannel!) as ChannelEntity;
+        return parsedChannel;
     }
 
     @UseMiddleware(isAuthenticated)
     @Mutation(() => Boolean)
     async leaveChannel (
         @Ctx()
-        { session }: MyContext,
+        { session, redis }: MyContext,
         @Arg('channelId')
         channelId: number,
         @PubSub()
@@ -232,11 +242,13 @@ export class AuthResolver {
         if (!user!.channelId) {
             throw new ErrorResponse('Join some channel first', 401);
         }
-
-        const channel = await ChannelEntity.findOne(channelId);
-        if (!channel) {
+        const redChannel = await redis.get(RED_CURRENT_CHANNEL);
+        // const channel = await ChannelEntity.findOne(channelId);
+        if (!redChannel) {
             throw new ErrorResponse('Channel does not exists', 404);
         }
+
+        const channel = parse(redChannel!) as ChannelEntity;
 
         if (channel.userIds && !channel.userIds.includes(user!.id)) {
             throw new ErrorResponse('You have already left', 404);
@@ -260,7 +272,6 @@ export class AuthResolver {
         const updatedUser = await UserEntity.findOne(user!.id);
 
         session.user = updatedUser;
-        console.log('test==== = ', updatedUser);
 
         pubsub.publish(NEW_NOTIFICATION, { message: `${ updatedUser?.username } has left`, channelId: channel.id });
         pubsub.publish(LEAVE_CHANNEL, { user: updatedUser, channelId });
@@ -272,7 +283,7 @@ export class AuthResolver {
     @Mutation(() => Boolean)
     async deleteUser (
         @Ctx()
-        { session }: MyContext
+        { session, redis }: MyContext
     ): Promise<boolean> {
 
         const userId = session.user!.id;
@@ -306,6 +317,8 @@ export class AuthResolver {
                 console.error(err);
             }
         });
+
+        await redis.flushall();
 
         return true;
     }

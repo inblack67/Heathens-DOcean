@@ -8,6 +8,8 @@ import { MessageEntity } from "../entities/Message";
 import { getConnection } from "typeorm";
 import { JOIN_CHANNEL, LEAVE_CHANNEL, NEW_MESSAGE, NEW_NOTIFICATION, REMOVED_MESSAGE } from "../utils/topics";
 import { customSort } from "../utils/utilities";
+import { RED_CHANNELS, RED_SINGLE_CHANNEL } from "../utils/redisKeys";
+import { parse, stringify } from "flatted";
 
 @Resolver(ChannelEntity)
 export class ChannelResolver {
@@ -40,8 +42,12 @@ export class ChannelResolver {
 
     @UseMiddleware(isAuthenticated)
     @Query(() => [ ChannelEntity ], {})
-    async getChannels (): Promise<ChannelEntity[]> {
-        const channels = await ChannelEntity.find();
+    async getChannels (
+        @Ctx()
+        { redis }: MyContext
+    ): Promise<ChannelEntity[]> {
+        const redChannels = await redis.lrange(RED_CHANNELS, 0, -1);
+        const channels = redChannels.map(channel => parse(channel));
         const sortedChannels = customSort<ChannelEntity[]>(channels) as ChannelEntity[];
         return sortedChannels;
     }
@@ -50,12 +56,21 @@ export class ChannelResolver {
     @Query(() => ChannelEntity, { nullable: true, })
     async getSingleChannel (
         @Arg('id')
-        id: number
+        id: number,
+        @Ctx()
+        { redis }: MyContext
     ): Promise<ChannelEntity | undefined> {
-        const channel = await ChannelEntity.findOne(id);
+
+        const redChannel = await redis.get(`${ RED_SINGLE_CHANNEL }:${ id }`);
+
+        const channel = redChannel ? parse(redChannel) : await ChannelEntity.findOne(id);
 
         if (!channel) {
             throw new ErrorResponse('Resource does not exits', 404);
+        }
+
+        if (!redChannel) {
+            await redis.set(`${ RED_SINGLE_CHANNEL }:${ id }`, stringify(channel));
         }
 
         return channel;
@@ -67,13 +82,21 @@ export class ChannelResolver {
         @Arg('channelId')
         channelId: number,
         @Ctx()
-        { usersLoader }: MyContext
+        { usersLoader, redis }: MyContext
     ): Promise<(UserEntity | Error)[]> {
-        const channel = await ChannelEntity.findOne(channelId);
+
+        const redChannel = await redis.get(`${ RED_SINGLE_CHANNEL }:${ channelId }`);
+
+        const channel = redChannel ? parse(redChannel) : await ChannelEntity.findOne(channelId);
 
         if (!channel) {
             throw new ErrorResponse('Resource does not exits', 404);
         }
+
+        if (!redChannel) {
+            await redis.set(`${ RED_SINGLE_CHANNEL }:${ channelId }`, stringify(channel));
+        }
+
         return usersLoader.loadMany(channel.userIds);
     }
 
@@ -181,12 +204,20 @@ export class ChannelResolver {
     @Mutation(() => Boolean, {})
     async deleteChannel (
         @Arg('id')
-        id: number
+        id: number,
+        @Ctx()
+        { redis }: MyContext
     ): Promise<boolean> {
-        const channel = await ChannelEntity.findOne(id);
+        const redChannel = await redis.get(`${ RED_SINGLE_CHANNEL }:${ id }`);
+
+        const channel = redChannel ? parse(redChannel) : await ChannelEntity.findOne(id);
 
         if (!channel) {
             throw new ErrorResponse('Resource does not exits', 404);
+        }
+
+        if (redChannel) {
+            await redis.del(`${ RED_SINGLE_CHANNEL }:${ id }`);
         }
 
         getConnection().transaction(async tn => {

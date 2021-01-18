@@ -106,7 +106,7 @@ const main = async () => {
 
     const apolloServer = new ApolloServer({
         schema,
-        context: ({ req, res }): MyContext => ({ req, res, session: req?.session, usersLoader: usersLoader(), messagesLoader: messagesLoader(), channelLoader: channelLoader(), pubsub: createPubSub() }),
+        context: ({ req, res }): MyContext => ({ req, res, redis: RedisClient, session: req?.session, usersLoader: usersLoader(), messagesLoader: messagesLoader(), channelLoader: channelLoader(), pubsub: createPubSub() }),
         subscriptions: {
             onConnect: (_, ws: any) => {
                 if (!ws.upgradeReq.headers.origin || ws.upgradeReq.headers.origin !== process.env.CLIENT_URL) {
