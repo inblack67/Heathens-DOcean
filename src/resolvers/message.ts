@@ -82,7 +82,7 @@ export class MessageResolver {
         @Ctx()
         { session, redis }: MyContext
     ): Promise<MessageEntity[]> {
-
+        console.time('getChannelMessages');
         const redChannel = await redis.get(`${ RED_SINGLE_CHANNEL }:${ channelId }`);
 
         const channel = redChannel ? parse(redChannel) : await ChannelEntity.findOne(channelId);
@@ -116,6 +116,8 @@ export class MessageResolver {
         sortedMessages.forEach(mess => {
             mess.content = decryptMe(mess.content, mess.ivString);
         });
+
+        console.timeEnd('getChannelMessages');
 
         return sortedMessages;
     }

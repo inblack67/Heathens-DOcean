@@ -43,7 +43,7 @@ const main = async () => {
                 database: process.env.POSTGRES_DB,
                 username: process.env.POSTGRES_USER,
                 password: process.env.POSTGRES_PASSWORD,
-                logging: true,
+                // logging: true,
                 synchronize: true,
                 host: process.env.DB_HOST,
                 entities: [ UserEntity, ChannelEntity, MessageEntity ]
