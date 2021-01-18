@@ -44,7 +44,7 @@ export class MessageResolver {
         @Arg('channelId')
         channelId: number,
         @Ctx()
-        { session, }: MyContext,
+        { session, redis }: MyContext,
         @PubSub()
         pubsub: PubSubEngine
     ): Promise<MessageEntity> {
@@ -68,6 +68,14 @@ export class MessageResolver {
                 SET "messageIds" = "messageIds" || ${ newMessage.id }
                 WHERE id = ${ channelId }
             `));
+
+        const updatedChannel = await ChannelEntity.findOne(channelId);
+        const oldRedChannel = await redis.get(`${ RED_SINGLE_CHANNEL }:${ channelId }`);
+
+        if (oldRedChannel) {
+            await redis.del(`${ RED_SINGLE_CHANNEL }:${ channelId }`);
+            await redis.set(`${ RED_SINGLE_CHANNEL }:${ channelId }`, stringify(updatedChannel));
+        }
 
         await pubsub.publish(NEW_MESSAGE, newMessage);
 
@@ -169,6 +177,15 @@ export class MessageResolver {
             `);
 
         });
+
+        const updatedChannel = await ChannelEntity.findOne(message.channelId);
+        const oldRedChannel = await redis.get(`${ RED_SINGLE_CHANNEL }:${ message.channelId }`);
+
+        if (oldRedChannel) {
+            await redis.del(`${ RED_SINGLE_CHANNEL }:${ message.channelId }`);
+            await redis.set(`${ RED_SINGLE_CHANNEL }:${ message.channelId }`, stringify(updatedChannel));
+        }
+
         await pubsub.publish(REMOVED_MESSAGE, message);
 
         return true;

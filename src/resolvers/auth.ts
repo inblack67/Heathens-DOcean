@@ -9,7 +9,7 @@ import { getConnection } from "typeorm";
 import { MessageEntity } from "../entities/Message";
 import { JOIN_CHANNEL, LEAVE_CHANNEL, NEW_NOTIFICATION } from "../utils/topics";
 import { validateHuman } from "../utils/validateHuman";
-import { RED_CURRENT_CHANNEL } from "../utils/redisKeys";
+import { RED_CURRENT_CHANNEL, RED_SINGLE_CHANNEL } from "../utils/redisKeys";
 import { stringify, parse } from 'flatted';
 
 @Resolver(UserEntity)
@@ -168,7 +168,6 @@ export class AuthResolver {
         pubsub: PubSubEngine
     ): Promise<boolean> {
 
-
         const user = session.user;
 
         if (user!.channelId) {
@@ -176,8 +175,6 @@ export class AuthResolver {
         }
 
         const channel = await ChannelEntity.findOne(channelId);
-
-        await redis.set(RED_CURRENT_CHANNEL, stringify(channel));
 
         if (!channel) {
             throw new ErrorResponse('Channel does not exist', 404);
@@ -204,6 +201,16 @@ export class AuthResolver {
         pubsub.publish(NEW_NOTIFICATION, { message: `${ user!.username } has joined`, channelId: channel.id });
 
         const updatedUser = await UserEntity.findOne(user!.id);
+        const updatedChannel = await ChannelEntity.findOne(channelId);
+
+        await redis.set(RED_CURRENT_CHANNEL, stringify(updatedChannel));
+
+        const redChannel = await redis.get(`${ RED_SINGLE_CHANNEL }:${ channelId }`);
+
+        if (redChannel) {
+            await redis.del(`${ RED_SINGLE_CHANNEL }:${ channelId }`);
+            await redis.set(`${ RED_SINGLE_CHANNEL }:${ channelId }`, stringify(updatedChannel));
+        }
 
         session.user!.channelId = channelId;
 
@@ -270,6 +277,14 @@ export class AuthResolver {
         });
 
         const updatedUser = await UserEntity.findOne(user!.id);
+        const updatedChannel = await ChannelEntity.findOne(channelId);
+
+        const oldRedChannel = await redis.get(`${ RED_SINGLE_CHANNEL }:${ channelId }`);
+
+        if (oldRedChannel) {
+            await redis.del(`${ RED_SINGLE_CHANNEL }:${ channelId }`);
+            await redis.set(`${ RED_SINGLE_CHANNEL }:${ channelId }`, stringify(updatedChannel));
+        }
 
         session.user = updatedUser;
 
@@ -310,6 +325,18 @@ export class AuthResolver {
             `);
 
         });
+
+        const channelId = session.user!.channelId;
+
+        if (channelId) {
+            const updatedChannel = await ChannelEntity.findOne(channelId);
+            const oldRedChannel = await redis.get(`${ RED_SINGLE_CHANNEL }:${ channelId }`);
+
+            if (oldRedChannel) {
+                await redis.del(`${ RED_SINGLE_CHANNEL }:${ channelId }`);
+                await redis.set(`${ RED_SINGLE_CHANNEL }:${ channelId }`, stringify(updatedChannel));
+            }
+        }
 
         session.destroy(err => {
             if (err) {
