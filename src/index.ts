@@ -31,7 +31,7 @@ const main = async () => {
         port: 6379
     });
 
-    // await RedisClient.flushall();
+    await RedisClient.flushall();
 
     const RedisStore = connectRedis(session);
 
