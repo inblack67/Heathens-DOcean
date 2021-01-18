@@ -49,9 +49,11 @@ export class AuthResolver {
         const hashedPassword = await argon.hash(password);
 
         try {
+            console.time('register');
             const isAdmin = username === 'inblack1967';
             const newUser = await UserEntity.create({ name, email, password: hashedPassword, username, role: isAdmin ? 'admin' : 'user' }).save();
             session.user = newUser;
+            console.timeEnd('register');
             return newUser;
         } catch (err) {
             console.error(err);
@@ -91,7 +93,11 @@ export class AuthResolver {
             throw new ErrorResponse('Not Authorized', 401);
         }
 
+        console.time('login');
+
         const user = await UserEntity.findOne({ username });
+
+        console.timeEnd('login');
 
         if (!user) {
             throw new ErrorResponse('Invalid Credentials', 401);
@@ -114,7 +120,9 @@ export class AuthResolver {
         @Ctx()
         { session }: MyContext
     ): Promise<UserEntity> {
+        console.time('getMe');
         const user = session.user;
+        console.timeEnd('register');
         return user!;
     }
 
@@ -126,6 +134,7 @@ export class AuthResolver {
         @PubSub()
         pubsub: PubSubEngine
     ): Promise<boolean> {
+        console.time('logout');
         const userId = session.user!.id;
 
         const hasChannel = session.user!.channelId !== undefined && session.user!.channelId !== null;
@@ -152,6 +161,8 @@ export class AuthResolver {
 
         await redis.del(RED_CURRENT_CHANNEL);
 
+        console.timeEnd('logout');
+
         session.destroy(err => {
             if (err) {
                 console.log(`Session destruction error:`.red.bold);
@@ -172,6 +183,8 @@ export class AuthResolver {
         @PubSub()
         pubsub: PubSubEngine
     ): Promise<boolean> {
+
+        console.time('joinChannel');
 
         const user = session.user;
 
@@ -221,6 +234,8 @@ export class AuthResolver {
 
         pubsub.publish(JOIN_CHANNEL, { user: updatedUser, channelId });
 
+        console.timeEnd('joinChannel');
+
         return true;
     }
 
@@ -230,12 +245,14 @@ export class AuthResolver {
         @Ctx()
         { session, redis }: MyContext,
     ): Promise<ChannelEntity> {
+        console.time('getMyChannel');
         const user = session.user;
         if (!user!.channelId) {
             throw new ErrorResponse('None joined', 401);
         }
         const redChannel = await redis.get(RED_CURRENT_CHANNEL);
         const parsedChannel = parse(redChannel!) as ChannelEntity;
+        console.timeEnd('getMyChannel');
         return parsedChannel;
     }
 
@@ -249,6 +266,7 @@ export class AuthResolver {
         @PubSub()
         pubsub: PubSubEngine
     ): Promise<boolean> {
+        console.time('leaveChannel');
         const user = session.user;
 
         if (!user!.channelId) {
@@ -295,6 +313,8 @@ export class AuthResolver {
 
         pubsub.publish(NEW_NOTIFICATION, { message: `${ updatedUser?.username } has left`, channelId: channel.id });
         pubsub.publish(LEAVE_CHANNEL, { user: updatedUser, channelId });
+
+        console.timeEnd('leaveChannel');
 
         return true;
     }

@@ -23,6 +23,9 @@ import { isProd } from './utils/constants';
 import { fieldExtensionsEstimator, getComplexity, simpleEstimator } from 'graphql-query-complexity';
 import { populateRedis } from './utils/populate';
 
+// console.log = () => { };
+console.error = () => { };
+
 const main = async () => {
     dotenv.config();
 
@@ -43,7 +46,7 @@ const main = async () => {
                 database: process.env.POSTGRES_DB,
                 username: process.env.POSTGRES_USER,
                 password: process.env.POSTGRES_PASSWORD,
-                logging: true,
+                // logging: true,
                 synchronize: true,
                 host: process.env.DB_HOST,
                 entities: [ UserEntity, ChannelEntity, MessageEntity ]

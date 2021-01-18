@@ -46,9 +46,11 @@ export class ChannelResolver {
         @Ctx()
         { redis }: MyContext
     ): Promise<ChannelEntity[]> {
+        console.time('getChannels');
         const redChannels = await redis.lrange(RED_CHANNELS, 0, -1);
         const channels = redChannels.map(channel => parse(channel));
         const sortedChannels = customSort<ChannelEntity[]>(channels) as ChannelEntity[];
+        console.timeEnd('getChannels');
         return sortedChannels;
     }
 
@@ -60,7 +62,7 @@ export class ChannelResolver {
         @Ctx()
         { redis }: MyContext
     ): Promise<ChannelEntity | undefined> {
-
+        console.time('getSingleChannel');
         const redChannel = await redis.get(`${ RED_SINGLE_CHANNEL }:${ id }`);
 
         const channel = redChannel ? parse(redChannel) : await ChannelEntity.findOne(id);
@@ -73,6 +75,8 @@ export class ChannelResolver {
             await redis.set(`${ RED_SINGLE_CHANNEL }:${ id }`, stringify(channel));
         }
 
+        console.timeEnd('getSingleChannel');
+
         return channel;
     }
 
@@ -84,7 +88,7 @@ export class ChannelResolver {
         @Ctx()
         { usersLoader, redis, session }: MyContext
     ): Promise<(UserEntity | Error)[]> {
-
+        console.time('getChannelUsers');
         const redChannel = await redis.get(`${ RED_SINGLE_CHANNEL }:${ channelId }`);
 
         const channel = redChannel ? parse(redChannel) : await ChannelEntity.findOne(channelId);
@@ -100,6 +104,8 @@ export class ChannelResolver {
         if (!redChannel) {
             await redis.set(`${ RED_SINGLE_CHANNEL }:${ channelId }`, stringify(channel));
         }
+
+        console.timeEnd('getChannelUsers');
 
         return usersLoader.loadMany(channel.userIds);
     }

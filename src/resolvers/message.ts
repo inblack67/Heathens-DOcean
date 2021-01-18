@@ -48,6 +48,7 @@ export class MessageResolver {
         @PubSub()
         pubsub: PubSubEngine
     ): Promise<MessageEntity> {
+        console.time('postMessage');
         const channel = await ChannelEntity.findOne(channelId);
         if (!channel) {
             throw new ErrorResponse('Resource does not exits', 404);
@@ -79,6 +80,8 @@ export class MessageResolver {
 
         await pubsub.publish(NEW_MESSAGE, newMessage);
 
+        console.timeEnd('postMessage');
+
         return newMessage;
     }
 
@@ -90,7 +93,7 @@ export class MessageResolver {
         @Ctx()
         { session, redis }: MyContext
     ): Promise<MessageEntity[]> {
-
+        console.time('getChannelMessages');
         const redChannel = await redis.get(`${ RED_SINGLE_CHANNEL }:${ channelId }`);
 
         const channel = redChannel ? parse(redChannel) : await ChannelEntity.findOne(channelId);
@@ -125,6 +128,8 @@ export class MessageResolver {
             mess.content = decryptMe(mess.content, mess.ivString);
         });
 
+        console.timeEnd('getChannelMessages');
+
         return sortedMessages;
     }
 
@@ -138,6 +143,7 @@ export class MessageResolver {
         @PubSub()
         pubsub: PubSubEngine
     ): Promise<boolean> {
+        console.time('deleteMessage');
         const message = await MessageEntity.findOne(id);
 
         if (!message) {
@@ -187,6 +193,8 @@ export class MessageResolver {
         }
 
         await pubsub.publish(REMOVED_MESSAGE, message);
+
+        console.timeEnd('deleteMessage');
 
         return true;
     }
