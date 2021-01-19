@@ -11,5 +11,7 @@ declare namespace NodeJS {
     POSTGRES_DB: string;
     CRYPTO_KEY: string;
     QUERY_LIMIT: string;
+    EMAIL: string;
+    PASSWORD: string;
   }
 }

@@ -7,6 +7,13 @@ export interface ISession extends Session, SessionData {
 }
 
 export interface IMyError extends GraphQLError {
-    cMessage?: string,
+    cMessage?: string;
     cStatus?: number;
+}
+
+export interface IEmail {
+    to: string;
+    subject: string;
+    text: string;
+    templatePath: string;
 }

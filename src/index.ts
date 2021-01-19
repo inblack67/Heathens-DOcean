@@ -22,9 +22,17 @@ import { ErrorResponse } from './utils/ErrorResponse';
 import { isProd } from './utils/constants';
 import { fieldExtensionsEstimator, getComplexity, simpleEstimator } from 'graphql-query-complexity';
 import { populateRedis } from './utils/populate';
+// import { sendMail } from './utils/sendMails';
+// import path from 'path';
 
 const main = async () => {
     dotenv.config();
+
+    // const to = 'devproddeploy@gmail.com';
+    // const subject = 'test subject';
+    // const text = 'test text';
+    // const templatePath = path.join(__dirname, '../', '/templates', '/verificationEmailTemplate.html');
+    // sendMail({ to, subject, text, templatePath });
 
     const RedisClient = new Redis({
         host: process.env.REDIS_HOST,
