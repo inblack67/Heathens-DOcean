@@ -10,8 +10,6 @@ import { NEW_MESSAGE, REMOVED_MESSAGE } from "../utils/topics";
 import { decryptMe, encryptMe } from "../utils/encryption";
 import crypto from 'crypto';
 import { customSort } from "../utils/utilities";
-import { RED_CHANNEL_MESSAGES, RED_SINGLE_CHANNEL } from "../utils/redisKeys";
-import { parse, stringify } from "flatted";
 
 @Resolver(MessageEntity)
 export class MessageResolver {
@@ -44,7 +42,7 @@ export class MessageResolver {
         @Arg('channelId')
         channelId: number,
         @Ctx()
-        { session, }: MyContext,
+        { session }: MyContext,
         @PubSub()
         pubsub: PubSubEngine
     ): Promise<MessageEntity> {
@@ -70,7 +68,6 @@ export class MessageResolver {
             `));
 
         await pubsub.publish(NEW_MESSAGE, newMessage);
-
         return newMessage;
     }
 
@@ -80,19 +77,12 @@ export class MessageResolver {
         @Arg('channelId')
         channelId: number,
         @Ctx()
-        { session, redis }: MyContext
+        { session }: MyContext
     ): Promise<MessageEntity[]> {
-        console.time('getChannelMessages');
-        const redChannel = await redis.get(`${ RED_SINGLE_CHANNEL }:${ channelId }`);
-
-        const channel = redChannel ? parse(redChannel) : await ChannelEntity.findOne(channelId);
+        const channel = await ChannelEntity.findOne(channelId);
 
         if (!channel) {
             throw new ErrorResponse('Channel does not exists', 401);
-        }
-
-        if (!redChannel) {
-            await redis.set(`${ RED_SINGLE_CHANNEL }:${ channel }`, stringify(channel));
         }
 
         const userId = session.user!.id;
@@ -100,24 +90,14 @@ export class MessageResolver {
             throw new ErrorResponse('You have to join the channel first', 401);
         }
 
-        const redChannelMessages = await redis.lrange(`${ RED_CHANNEL_MESSAGES }:${ channelId }`, 0, -1);
 
-        const parsedRedChannelMessages = redChannelMessages.map(mess => parse(mess));
-
-        const messages = redChannelMessages.length > 0 ? parsedRedChannelMessages : await MessageEntity.find({ channelId });
-
-        if (redChannelMessages.length < 0) {
-            const stringifiedMessages = messages.map(mess => stringify(mess));
-            await redis.lpush(`${ RED_CHANNEL_MESSAGES }:${ channelId }`, ...stringifiedMessages);
-        }
+        const messages = await MessageEntity.find({ channelId });
 
         const sortedMessages = customSort<MessageEntity[]>(messages as MessageEntity[]) as MessageEntity[];
 
         sortedMessages.forEach(mess => {
             mess.content = decryptMe(mess.content, mess.ivString);
         });
-
-        console.timeEnd('getChannelMessages');
 
         return sortedMessages;
     }
@@ -128,7 +108,7 @@ export class MessageResolver {
         @Arg('id')
         id: number,
         @Ctx()
-        { session, redis }: MyContext,
+        { session }: MyContext,
         @PubSub()
         pubsub: PubSubEngine
     ): Promise<boolean> {
@@ -144,14 +124,7 @@ export class MessageResolver {
             throw new ErrorResponse('Not Authorized', 400);
         }
 
-        const redChannel = await redis.get(`${ RED_SINGLE_CHANNEL }:${ message.channelId }`);
-
-        const channel = redChannel ? parse(redChannel) : await ChannelEntity.findOne(message.channelId);
-
-        if (!redChannel) {
-            await redis.set(`${ RED_SINGLE_CHANNEL }:${ message.channelId }`, stringify(channel));
-        }
-
+        const channel = await ChannelEntity.findOne(message.channelId);
 
         if (!channel!.userIds.includes(message.posterId)) {
             throw new ErrorResponse('You must join the channel first', 404);
@@ -172,7 +145,6 @@ export class MessageResolver {
 
         });
         await pubsub.publish(REMOVED_MESSAGE, message);
-
         return true;
     }
 }
