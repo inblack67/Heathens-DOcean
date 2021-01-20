@@ -123,7 +123,6 @@ export class AuthResolver {
             if (!res) {
                 throw new ErrorResponse('Error Sending The Mail', 500);
             }
-            session.user = newUser;
             return newUser;
         } catch (err) {
             console.error(err);
@@ -143,7 +142,7 @@ export class AuthResolver {
         @Arg('password')
         password: string,
         @Ctx()
-        { session }: MyContext,
+        { session, redis }: MyContext,
         @Arg('recaptchaToken', { nullable: true })
         recaptchaToken?: string,
     ): Promise<UserEntity> {
@@ -176,7 +175,23 @@ export class AuthResolver {
             throw new ErrorResponse('Invalid Credentials', 401);
         }
 
+        if (!user.verified) {
+            const to = user.email;
+            const text = 'It seems that you can not get any futher without verifying your mail';
+            const templatePath = path.join(__dirname, '../', '../', '/templates', '/emailTemplate.html');
+            const subject = 'Verify Email';
+            const token = v4();
+            await redis.set(`${ RED_VERIFY_EMAIL_TOKEN }:${ token }`, user.email, 'ex', 1000 * 60 * 60); // one hour
+            const url = `${ process.env.CLIENT_URL }/verify-email/${ token }`;
+            const res = await sendMail({ to, subject, templatePath, text, username, url });
+            if (!res) {
+                throw new ErrorResponse('Error Sending The Mail', 500);
+            }
+            throw new ErrorResponse('Verify Your Mail', 401);
+        }
+
         session.user = user;
+
         return user;
     }
 
