@@ -129,7 +129,6 @@ const main = async () => {
             {
                 requestDidStart: () => ({
                     didResolveOperation ({ request, document }) {
-                        console.log('request = ', request);
                         const complexity = getComplexity({
                             schema,
                             operationName: request.operationName,
