@@ -12,7 +12,7 @@ import { validateHuman } from "../utils/validateHuman";
 import { sendMail } from "../utils/sendMails";
 import path from 'path';
 import { v4 } from 'uuid';
-import { RED_FORGOT_PASSWORD_TOKEN } from '../utils/redisKeys';
+import { RED_FORGOT_PASSWORD_TOKEN, RED_VERIFY_EMAIL_TOKEN } from '../utils/redisKeys';
 
 @Resolver(UserEntity)
 export class AuthResolver {
@@ -33,12 +33,12 @@ export class AuthResolver {
         const templatePath = path.join(__dirname, '../', '../', '/templates', '/emailTemplate.html');
         const subject = 'Forgot Password';
         const token = v4();
-        await redis.set(`${ RED_FORGOT_PASSWORD_TOKEN }:${ token }`, user.id.toString(), 'ex', 1000 * 60 * 60); // one hour
-        const url = `${ process.env.MY_HOST }/reset-password/${ token }`;
+        await redis.set(`${ RED_FORGOT_PASSWORD_TOKEN }:${ token }`, user.email, 'ex', 1000 * 60 * 60); // one hour
+        const url = `${ process.env.CLIENT_URL }/reset-password/${ token }`;
         const username = user.username;
-        const res = sendMail({ to, subject, templatePath, text, username, url });
+        const res = await sendMail({ to, subject, templatePath, text, username, url });
         if (!res) {
-            return false;
+            throw new ErrorResponse('Error Sending The Mail', 500);
         }
         return true;
     }
@@ -52,11 +52,26 @@ export class AuthResolver {
         @Ctx()
         { redis }: MyContext
     ) {
-        const redisToken = await redis.get(`${ RED_FORGOT_PASSWORD_TOKEN }:${ token }`);
-        if (!redisToken) {
+        const resetData = await redis.get(`${ RED_FORGOT_PASSWORD_TOKEN }:${ token }`);
+        if (!resetData) {
             throw new ErrorResponse('Invalid Reset Password Link', 401);
         }
-        await UserEntity.update({ id: +redisToken }, { password: newPassword });
+        await UserEntity.update({ email: resetData }, { password: newPassword });
+        return true;
+    }
+
+    @Mutation(() => Boolean)
+    async verifyEmail (
+        @Arg('token')
+        token: string,
+        @Ctx()
+        { redis }: MyContext
+    ) {
+        const resetData = await redis.get(`${ RED_VERIFY_EMAIL_TOKEN }:${ token }`);
+        if (!resetData) {
+            throw new ErrorResponse('Invalid Email Verification Link', 401);
+        }
+        await UserEntity.update({ email: resetData }, { verified: true });
         return true;
     }
 
@@ -71,7 +86,7 @@ export class AuthResolver {
         @Arg('password')
         password: string,
         @Ctx()
-        { session }: MyContext,
+        { session, redis }: MyContext,
         @Arg('recaptchaToken', { nullable: true })
         recaptchaToken?: string
     ): Promise<UserEntity> {
@@ -96,6 +111,18 @@ export class AuthResolver {
         try {
             const isAdmin = username === 'inblack1967';
             const newUser = await UserEntity.create({ name, email, password: hashedPassword, username, role: isAdmin ? 'admin' : 'user' }).save();
+
+            const to = email;
+            const text = 'It seems that you can not get any futher without verifying your mail';
+            const templatePath = path.join(__dirname, '../', '../', '/templates', '/emailTemplate.html');
+            const subject = 'Verify Email';
+            const token = v4();
+            await redis.set(`${ RED_VERIFY_EMAIL_TOKEN }:${ token }`, email, 'ex', 1000 * 60 * 60); // one hour
+            const url = `${ process.env.CLIENT_URL }/verify-email/${ token }`;
+            const res = await sendMail({ to, subject, templatePath, text, username, url });
+            if (!res) {
+                throw new ErrorResponse('Error Sending The Mail', 500);
+            }
             session.user = newUser;
             return newUser;
         } catch (err) {
