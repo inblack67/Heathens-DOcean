@@ -14,10 +14,10 @@ export const readHTMLFile = (path: string) => {
 
 export const sendMail = async ({ to, subject, text, templatePath, username, url }: IEmail): Promise<boolean | void> => {
 
-    if (process.env.NODE_ENV !== 'production') {
-        console.log(`Dev => Mail not sent`.blue.bold);
-        return false;
-    }
+    // if (process.env.NODE_ENV !== 'production') {
+    //     console.log(`Dev => Mail not sent`.blue.bold);
+    //     return false;
+    // }
 
     try {
         const templateFile = await readHTMLFile(templatePath);

@@ -56,7 +56,8 @@ export class AuthResolver {
         if (!resetData) {
             throw new ErrorResponse('Invalid Reset Password Link', 401);
         }
-        await UserEntity.update({ email: resetData }, { password: newPassword });
+        const hashedPassword = await argon.hash(newPassword);
+        await UserEntity.update({ email: resetData }, { password: hashedPassword });
         return true;
     }
 
@@ -67,7 +68,9 @@ export class AuthResolver {
         @Ctx()
         { redis }: MyContext
     ) {
+        console.log('verify token received = ', token);
         const resetData = await redis.get(`${ RED_VERIFY_EMAIL_TOKEN }:${ token }`);
+        console.log('verify resetData = ', resetData);
         if (!resetData) {
             throw new ErrorResponse('Invalid Email Verification Link', 401);
         }

@@ -129,6 +129,7 @@ const main = async () => {
             {
                 requestDidStart: () => ({
                     didResolveOperation ({ request, document }) {
+                        console.log('request = ', request);
                         const complexity = getComplexity({
                             schema,
                             operationName: request.operationName,
@@ -139,12 +140,11 @@ const main = async () => {
                                 simpleEstimator({ defaultComplexity: 1 }),
                             ],
                         });
-                        if (complexity <= +process.env.QUERY_LIMIT) {
-                            console.log(`Query Complexity = ${ complexity }`.green.bold);
-                        } else {
+                        if (complexity >= +process.env.QUERY_LIMIT) {
                             console.log(`FATAL Query Complexity = ${ complexity }`.red.bold);
                             throw new ErrorResponse('Too Complex', 401);
                         }
+                        console.log(`Query Complexity = ${ complexity }`.green.bold);
                     },
                 }),
             },
