@@ -22,6 +22,10 @@ export class UserEntity extends BaseEntity {
     @Column({ unique: true })
     email!: string;
 
+    @Field(() => Boolean)
+    @Column({ default: false })
+    verified!: boolean;
+
     @Column()
     password!: string;
 

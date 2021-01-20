@@ -9,9 +9,56 @@ import { getConnection } from "typeorm";
 import { MessageEntity } from "../entities/Message";
 import { JOIN_CHANNEL, LEAVE_CHANNEL, NEW_NOTIFICATION } from "../utils/topics";
 import { validateHuman } from "../utils/validateHuman";
+import { sendMail } from "../utils/sendMails";
+import path from 'path';
+import { v4 } from 'uuid';
+import { RED_FORGOT_PASSWORD_TOKEN } from '../utils/redisKeys';
 
 @Resolver(UserEntity)
 export class AuthResolver {
+
+    @Mutation(() => Boolean)
+    async forgotPassword (
+        @Arg('email')
+        email: string,
+        @Ctx()
+        { redis }: MyContext
+    ) {
+        const user = await UserEntity.findOne({ email });
+        if (!user) {
+            throw new ErrorResponse('Invalid Credentials', 401);
+        }
+        const to = user.email;
+        const text = 'It seems that you have forgotten your dirty little secret';
+        const templatePath = path.join(__dirname, '../', '../', '/templates', '/emailTemplate.html');
+        const subject = 'Forgot Password';
+        const token = v4();
+        await redis.set(`${ RED_FORGOT_PASSWORD_TOKEN }:${ token }`, user.id.toString(), 'ex', 1000 * 60 * 60); // one hour
+        const url = `${ process.env.MY_HOST }/reset-password/${ token }`;
+        const username = user.username;
+        const res = sendMail({ to, subject, templatePath, text, username, url });
+        if (!res) {
+            return false;
+        }
+        return true;
+    }
+
+    @Mutation(() => Boolean)
+    async resetPassword (
+        @Arg('token')
+        token: string,
+        @Arg('newPassword')
+        newPassword: string,
+        @Ctx()
+        { redis }: MyContext
+    ) {
+        const redisToken = await redis.get(`${ RED_FORGOT_PASSWORD_TOKEN }:${ token }`);
+        if (!redisToken) {
+            throw new ErrorResponse('Invalid Reset Password Link', 401);
+        }
+        await UserEntity.update({ id: +redisToken }, { password: newPassword });
+        return true;
+    }
 
     @Mutation(() => UserEntity)
     async registerUser (

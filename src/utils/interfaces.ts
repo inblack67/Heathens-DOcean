@@ -16,4 +16,6 @@ export interface IEmail {
     subject: string;
     text: string;
     templatePath: string;
+    username: string;
+    url: string;
 }

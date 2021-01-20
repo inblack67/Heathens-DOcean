@@ -12,19 +12,21 @@ export const readHTMLFile = (path: string) => {
     });
 };
 
-export const sendMail = async ({ to, subject, text, templatePath }: IEmail) => {
+export const sendMail = async ({ to, subject, text, templatePath, username, url }: IEmail): Promise<boolean | void> => {
 
     if (process.env.NODE_ENV !== 'production') {
         console.log(`Dev => Mail not sent`.blue.bold);
-        return;
+        return false;
     }
 
     try {
         const templateFile = await readHTMLFile(templatePath);
         const template = hbs.compile(templateFile);
         const variables = {
-            name: 'you',
-            url: 'https://app.21heathens.tk'
+            username,
+            url,
+            text,
+            subject
         };
         const toBeSentHTML = template(variables);
 
@@ -45,6 +47,7 @@ export const sendMail = async ({ to, subject, text, templatePath }: IEmail) => {
         });
 
         console.log(`Mail sent`.green.bold);
+        return true;
     } catch (err) {
         console.log(`Error sending the mail`.red.bold);
         console.error(err);
