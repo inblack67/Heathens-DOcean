@@ -7,7 +7,6 @@ import { UserEntity } from "../entities/User";
 import { MessageEntity } from "../entities/Message";
 import { getConnection } from "typeorm";
 import { JOIN_CHANNEL, LEAVE_CHANNEL, NEW_MESSAGE, NEW_NOTIFICATION, REMOVED_MESSAGE } from "../utils/topics";
-import { customSort } from "../utils/utilities";
 import { RED_CHANNELS } from "../utils/redisKeys";
 import { parse, stringify } from "flatted";
 
@@ -44,12 +43,11 @@ export class ChannelResolver {
     @Query(() => [ ChannelEntity ], {})
     async getChannels (
         @Ctx()
-        { redis }: MyContext
+        { redis }: MyContext,
     ): Promise<ChannelEntity[]> {
         const redChannels = await redis.lrange(RED_CHANNELS, 0, -1);
         const channels = redChannels.map(channel => parse(channel));
-        const sortedChannels = customSort<ChannelEntity[]>(channels) as ChannelEntity[];
-        return sortedChannels;
+        return channels;
     }
 
     @UseMiddleware(isAuthenticated)

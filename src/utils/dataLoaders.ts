@@ -1,9 +1,9 @@
 import DataLoader from 'dataloader';
+import { getConnection } from 'typeorm';
 import { ChannelEntity } from '../entities/Channel';
 import { MessageEntity } from '../entities/Message';
 import { UserEntity } from '../entities/User';
 import { decryptMe } from './encryption';
-import { customSort } from './utilities';
 
 export const channelLoader = () => new DataLoader<number, ChannelEntity>(async (ids) => {
     const channels = await ChannelEntity.findByIds(ids as number[]);
@@ -14,8 +14,11 @@ export const channelLoader = () => new DataLoader<number, ChannelEntity>(async (
 
 
 export const messagesLoader = () => new DataLoader<number, MessageEntity>(async (ids) => {
-    const messages = await MessageEntity.findByIds(ids as number[]);
-    const sortedMessages = customSort<MessageEntity[]>(messages) as MessageEntity[];
+
+    const sortedMessages: MessageEntity[] = await getConnection().query(`
+        SELECT * from message_entity
+        ORDER BY "createdAt" DESC
+    `);
 
     sortedMessages.forEach(mess => {
         mess.content = decryptMe(mess.content, mess.ivString);
