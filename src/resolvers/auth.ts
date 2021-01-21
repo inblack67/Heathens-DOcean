@@ -8,7 +8,7 @@ import { ChannelEntity } from "../entities/Channel";
 import { getConnection } from "typeorm";
 import { MessageEntity } from "../entities/Message";
 import { JOIN_CHANNEL, LEAVE_CHANNEL, NEW_NOTIFICATION } from "../utils/topics";
-import { validateHuman } from "../utils/validateHuman";
+import { recaptchaTest } from "../utils/validateHuman";
 import { sendMail } from "../utils/sendMails";
 import path from 'path';
 import { v4 } from 'uuid';
@@ -22,8 +22,13 @@ export class AuthResolver {
         @Arg('email')
         email: string,
         @Ctx()
-        { redis }: MyContext
+        { redis }: MyContext,
+        @Arg('recaptchaToken', { nullable: true })
+        recaptchaToken?: string,
     ) {
+
+        await recaptchaTest(recaptchaToken);
+
         const user = await UserEntity.findOne({ email });
         if (!user) {
             throw new ErrorResponse('Invalid Credentials', 401);
@@ -50,8 +55,13 @@ export class AuthResolver {
         @Arg('newPassword')
         newPassword: string,
         @Ctx()
-        { redis }: MyContext
+        { redis }: MyContext,
+        @Arg('recaptchaToken', { nullable: true })
+        recaptchaToken?: string,
     ) {
+
+        await recaptchaTest(recaptchaToken);
+
         const resetData = await redis.get(`${ RED_FORGOT_PASSWORD_TOKEN }:${ token }`);
         if (!resetData) {
             throw new ErrorResponse('Invalid Reset Password Link', 401);
@@ -92,17 +102,8 @@ export class AuthResolver {
         @Arg('recaptchaToken', { nullable: true })
         recaptchaToken?: string
     ): Promise<UserEntity> {
-        if (process.env.NODE_ENV !== 'development' && !recaptchaToken) {
-            throw new ErrorResponse('Where is your recaptcha token?', 401);
-        }
 
-        if (recaptchaToken) {
-            const isHuman = validateHuman(recaptchaToken);
-
-            if (!isHuman) {
-                throw new ErrorResponse('Are you a robot?', 401);
-            }
-        }
+        await recaptchaTest(recaptchaToken);
 
         if (session.user) {
             throw new ErrorResponse('Not Authorized', 401);
@@ -148,17 +149,7 @@ export class AuthResolver {
         @Arg('recaptchaToken', { nullable: true })
         recaptchaToken?: string,
     ): Promise<UserEntity> {
-        if (process.env.NODE_ENV !== 'development' && !recaptchaToken) {
-            throw new ErrorResponse('Where is your recaptcha token?', 401);
-        }
-
-        if (recaptchaToken) {
-            const isHuman = validateHuman(recaptchaToken);
-
-            if (!isHuman) {
-                throw new ErrorResponse('Are you a robot?', 401);
-            }
-        }
+        await recaptchaTest(recaptchaToken);
 
         if (session.user) {
             throw new ErrorResponse('Not Authorized', 401);
