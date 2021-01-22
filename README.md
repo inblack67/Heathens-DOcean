@@ -3,7 +3,10 @@
 - Real Time Slack Clone
 
 - Functionalities
-    - Auth
+    - Login
+    - Register
+    - Reset Password
+    - Verify Email
     - Channels
     - Messages => End-To-End Encrypted
 
@@ -13,6 +16,7 @@
     - Apollo
     - TypeGraphQL
     - GraphQL Codegen
+    - Cursor Pagination
     - Postgres
     - TypeORM
     - Node.js
@@ -32,3 +36,4 @@
     - PWA
 
 - [Deployed](https://app.21heathens.tk)
+- [Repo](https://github.com/inblack67/Heathens)
