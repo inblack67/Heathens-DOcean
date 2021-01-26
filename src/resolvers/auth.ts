@@ -12,7 +12,9 @@ import { recaptchaTest } from "../utils/validateHuman";
 import { sendMail } from "../utils/sendMails";
 import path from 'path';
 import { v4 } from 'uuid';
-import { RED_FORGOT_PASSWORD_TOKEN, RED_VERIFY_EMAIL_TOKEN } from '../utils/redisKeys';
+import { RED_CURRENT_USER, RED_FORGOT_PASSWORD_TOKEN, RED_VERIFY_EMAIL_TOKEN } from '../utils/redisKeys';
+import jwt from 'jsonwebtoken';
+import { parse, stringify } from "flatted";
 
 @Resolver(UserEntity)
 export class AuthResolver {
@@ -188,14 +190,68 @@ export class AuthResolver {
         return user;
     }
 
+    @Mutation(() => String)
+    async nativeLogin (
+        @Arg('username')
+        username: string,
+        @Arg('password')
+        password: string,
+        @Ctx()
+        { session, redis }: MyContext,
+        @Arg('recaptchaToken', { nullable: true })
+        recaptchaToken?: string,
+    ): Promise<String> {
+        await recaptchaTest(recaptchaToken);
+
+        if (session.user) {
+            throw new ErrorResponse('Not Authorized', 401);
+        }
+
+        const user = await UserEntity.findOne({ username });
+
+        if (!user) {
+            throw new ErrorResponse('Invalid Credentials', 401);
+
+        }
+
+        const isValidPassword = await argon.verify(user.password, password);
+
+        if (!isValidPassword) {
+            throw new ErrorResponse('Invalid Credentials', 401);
+        }
+
+        if (!user.verified) {
+            const to = user.email;
+            const text = 'It seems that you can not get any futher without verifying your mail';
+            const templatePath = path.join(__dirname, '../', '../', '/templates', '/emailTemplate.html');
+            const subject = 'Verify Email';
+            const token = v4();
+            await redis.set(`${ RED_VERIFY_EMAIL_TOKEN }:${ token }`, user.email, 'ex', 1000 * 60 * 60); // one hour
+            const url = `${ process.env.CLIENT_URL }/verify-email/${ token }`;
+            const res = await sendMail({ to, subject, templatePath, text, username, url });
+            if (!res) {
+                throw new ErrorResponse('Error Sending The Mail', 500);
+            }
+            throw new ErrorResponse('Verify Your Mail', 401);
+        }
+
+        const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET);
+
+        await redis.set(RED_CURRENT_USER, stringify(user));
+
+        return token;
+    }
+
     @UseMiddleware(isAuthenticated)
     @Query(() => UserEntity)
     async getMe (
         @Ctx()
-        { session }: MyContext
+        { session, redis }: MyContext
     ): Promise<UserEntity> {
         const user = session.user;
-        return user!;
+        const stringifiedRedUser = await redis.get(RED_CURRENT_USER);
+        const parsedRedUser = stringifiedRedUser ? parse(stringifiedRedUser) : null;
+        return user || parsedRedUser;
     }
 
     @UseMiddleware(isAuthenticated)

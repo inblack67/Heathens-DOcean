@@ -3,6 +3,7 @@ declare namespace NodeJS {
     CLIENT_URL: string;
     PORT: string;
     SESSION_SECRET: string;
+    JWT_SECRET: string;
     COOKIE_DOMAIN: string;
     NODE_ENV: string;
     RECAPTCHA_SECRET: string;

@@ -4,6 +4,7 @@ import { UserEntity } from '../entities/User';
 
 export interface ISession extends Session, SessionData {
     user?: UserEntity;
+    token?: string;
 }
 
 export interface IMyError extends GraphQLError {
@@ -18,4 +19,9 @@ export interface IEmail {
     templatePath: string;
     username: string;
     url: string;
+}
+
+export interface IJwt {
+    iat: Date,
+    _id: string;
 }

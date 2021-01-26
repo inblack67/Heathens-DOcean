@@ -65,16 +65,25 @@ const main = async () => {
     app.set('trust proxy', 1);
 
     app.use(cors({
-        origin: isProd() ? (origin, cb) => {
-            if (!origin || origin !== process.env.CLIENT_URL) {
-                cb(new ErrorResponse('Maybe some other time', 401), false);
-            } else {
-                cb(null, true);
-            }
-        } : process.env.CLIENT_URL,
+        origin: (origin, cb) => {
+            console.log('origin = ', origin);
+            cb(null, true);
+        },
         credentials: true,
         optionsSuccessStatus: 200
     }));
+
+    // app.use(cors({
+    //     origin: isProd() ? (origin, cb) => {
+    //         if (!origin || origin !== process.env.CLIENT_URL) {
+    //             cb(new ErrorResponse('Maybe some other time', 401), false);
+    //         } else {
+    //             cb(null, true);
+    //         }
+    //     } : process.env.CLIENT_URL,
+    //     credentials: true,
+    //     optionsSuccessStatus: 200
+    // }));
 
     app.get('/', (_: Request, res: Response) => {
         res.send('API up and runnin');
@@ -91,7 +100,7 @@ const main = async () => {
         resave: false,
         saveUninitialized: false,
         cookie: {
-            httpOnly: true,
+            httpOnly: false,
             sameSite: 'lax',
             secure: isProd(),
             maxAge: 1000 * 60 * 60,
@@ -106,7 +115,9 @@ const main = async () => {
 
     const apolloServer = new ApolloServer({
         schema,
-        context: ({ req, res }): MyContext => ({ req, res, redis: RedisClient, session: req?.session, usersLoader: usersLoader(), messagesLoader: messagesLoader(), channelLoader: channelLoader(), pubsub: createPubSub() }),
+        context: ({ req, res }): MyContext => ({
+            req, res, redis: RedisClient, session: req?.session, usersLoader: usersLoader(), messagesLoader: messagesLoader(), channelLoader: channelLoader(), pubsub: createPubSub()
+        }),
         subscriptions: {
             onConnect: (_, ws: any) => {
                 if (!ws.upgradeReq.headers.origin || ws.upgradeReq.headers.origin !== process.env.CLIENT_URL) {

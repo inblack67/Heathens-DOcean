@@ -1,11 +1,17 @@
 import { Field, ObjectType } from "type-graphql";
 import { Entity, Column, CreateDateColumn, BaseEntity, PrimaryGeneratedColumn, OneToMany } from "typeorm";
+import { v4 } from "uuid";
 import { MessageEntity } from "./Message";
 import { UserEntity } from './User';
 
 @ObjectType()
 @Entity()
 export class ChannelEntity extends BaseEntity {
+
+    @Field(() => String)
+    @Column({ default: v4() })
+    _id: string;
+
     @Field(() => Number)
     @PrimaryGeneratedColumn()
     id!: number;
