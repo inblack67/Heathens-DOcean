@@ -14,5 +14,6 @@ declare namespace NodeJS {
     QUERY_LIMIT: string;
     EMAIL: string;
     PASSWORD: string;
+    ADMIN_USERNAME: string;
   }
 }

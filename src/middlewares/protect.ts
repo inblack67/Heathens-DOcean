@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import { IJwt } from "../utils/interfaces";
 import { RED_CURRENT_USER } from "../utils/redisKeys";
 import { parse } from "flatted";
+import { UserEntity } from "../entities/User";
 
 export const isAuthenticated: MiddlewareFn<MyContext> = async ({ context: { req, redis, session } }, next) => {
 
@@ -30,12 +31,29 @@ export const isAuthenticated: MiddlewareFn<MyContext> = async ({ context: { req,
     }
 };
 
-export const isAdmin: MiddlewareFn<MyContext> = async ({ context }, next) => {
-    const currentUser = context.session.user;
+export const isAdmin: MiddlewareFn<MyContext> = async ({ context: { redis, req, session } }, next) => {
 
-    if (currentUser!.role !== 'admin') {
-        throw new ErrorResponse('Not Authorized', 401);
+    const authHeader = req.headers.authorization;
+
+    if (authHeader) {
+        const stringifiedRedUser = await redis.get(RED_CURRENT_USER);
+        const parsedRedUser = parse(stringifiedRedUser!) as UserEntity;
+
+        if (parsedRedUser.role !== 'admin') {
+            throw new ErrorResponse('Not Authorized', 401);
+        }
+
+        return next();
     }
 
-    return next();
+    else {
+        const currentUser = session.user;
+
+        if (currentUser!.role !== 'admin') {
+            throw new ErrorResponse('Not Authorized', 401);
+        }
+
+        return next();
+    }
+
 };

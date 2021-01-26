@@ -65,25 +65,16 @@ const main = async () => {
     app.set('trust proxy', 1);
 
     app.use(cors({
-        origin: (origin, cb) => {
-            console.log('origin = ', origin);
-            cb(null, true);
-        },
+        origin: isProd() ? (origin, cb) => {
+            if (origin && origin !== process.env.CLIENT_URL) {
+                cb(new ErrorResponse('Maybe some other time', 401), false);
+            } else {
+                cb(null, true);
+            }
+        } : '*',
         credentials: true,
         optionsSuccessStatus: 200
     }));
-
-    // app.use(cors({
-    //     origin: isProd() ? (origin, cb) => {
-    //         if (!origin || origin !== process.env.CLIENT_URL) {
-    //             cb(new ErrorResponse('Maybe some other time', 401), false);
-    //         } else {
-    //             cb(null, true);
-    //         }
-    //     } : process.env.CLIENT_URL,
-    //     credentials: true,
-    //     optionsSuccessStatus: 200
-    // }));
 
     app.get('/', (_: Request, res: Response) => {
         res.send('API up and runnin');
@@ -100,7 +91,7 @@ const main = async () => {
         resave: false,
         saveUninitialized: false,
         cookie: {
-            httpOnly: false,
+            httpOnly: true,
             sameSite: 'lax',
             secure: isProd(),
             maxAge: 1000 * 60 * 60,
@@ -123,12 +114,12 @@ const main = async () => {
                 if (!ws.upgradeReq.headers.origin || ws.upgradeReq.headers.origin !== process.env.CLIENT_URL) {
                     throw new ErrorResponse('Maybe some other time', 401);
                 }
-                sessionParser(ws.upgradeReq as Request, {} as Response, () => {
-                    if (!ws.upgradeReq.session.user) {
-                        // yet to be reasearched
-                        // throw new ErrorResponse( 'Not Authorized For Subscriptions!', 401 );
-                    }
-                });
+                // sessionParser(ws.upgradeReq as Request, {} as Response, () => {
+                //     // if (!ws.upgradeReq.session.user) {
+                //     //     // yet to be reasearched
+                //     //     // throw new ErrorResponse( 'Not Authorized For Subscriptions!', 401 );
+                //     // }
+                // });
             }
         },
         formatError: (err: GraphQLError) => {

@@ -107,14 +107,16 @@ export class AuthResolver {
 
         await recaptchaTest(recaptchaToken);
 
-        if (session.user) {
+        const redUser = await redis.get(RED_CURRENT_USER);
+
+        if (session.user || redUser) {
             throw new ErrorResponse('Not Authorized', 401);
         }
 
         const hashedPassword = await argon.hash(password);
 
         try {
-            const isAdmin = username === 'inblack1967';
+            const isAdmin = username === process.env.ADMIN_USERNAME;
             const newUser = await UserEntity.create({ name, email, password: hashedPassword, username, role: isAdmin ? 'admin' : 'user' }).save();
 
             const to = email;
@@ -197,14 +199,16 @@ export class AuthResolver {
         @Arg('password')
         password: string,
         @Ctx()
-        { session, redis }: MyContext,
+        { redis }: MyContext,
         @Arg('recaptchaToken', { nullable: true })
         recaptchaToken?: string,
     ): Promise<String> {
         await recaptchaTest(recaptchaToken);
 
-        if (session.user) {
-            throw new ErrorResponse('Not Authorized', 401);
+        const redUser = await redis.get(RED_CURRENT_USER);
+
+        if (redUser) {
+            throw new ErrorResponse('Not Auth', 401);
         }
 
         const user = await UserEntity.findOne({ username });
@@ -235,7 +239,9 @@ export class AuthResolver {
             throw new ErrorResponse('Verify Your Mail', 401);
         }
 
-        const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET);
+        const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, {
+            expiresIn: '1d',
+        });
 
         await redis.set(RED_CURRENT_USER, stringify(user));
 
@@ -249,9 +255,12 @@ export class AuthResolver {
         { session, redis }: MyContext
     ): Promise<UserEntity> {
         const user = session.user;
+        if (user) {
+            return user;
+        }
         const stringifiedRedUser = await redis.get(RED_CURRENT_USER);
-        const parsedRedUser = stringifiedRedUser ? parse(stringifiedRedUser) : null;
-        return user || parsedRedUser;
+        const parsedRedUser = parse(stringifiedRedUser!) as UserEntity;
+        return parsedRedUser;
     }
 
     @UseMiddleware(isAuthenticated)
@@ -288,6 +297,41 @@ export class AuthResolver {
                 console.error(err);
             }
         });
+
+        return true;
+    }
+
+    @UseMiddleware(isAuthenticated)
+    @Mutation(() => Boolean)
+    async nativeLogout (
+        @Ctx()
+        { redis }: MyContext,
+        @PubSub()
+        pubsub: PubSubEngine
+    ): Promise<boolean> {
+
+        const redUser = await redis.get(RED_CURRENT_USER);
+
+        const user = parse(redUser!) as UserEntity;
+        const userId = user.id;
+
+        const hasChannel = user.channelId !== undefined && user.channelId !== null;
+
+        const channelId = user.channelId;
+
+        if (hasChannel) {
+            await UserEntity.update({ id: userId }, { channelId: undefined });
+            const updatedUser = await UserEntity.findOne(userId);
+            pubsub.publish(NEW_NOTIFICATION, { message: `${ user.username } has left`, channelId: channelId });
+            pubsub.publish(LEAVE_CHANNEL, { user: updatedUser, channelId });
+        }
+
+
+        await getConnection().query((`
+                UPDATE channel_entity SET "userIds" = (SELECT ARRAY(SELECT UNNEST("userIds")
+                EXCEPT
+                SELECT UNNEST(ARRAY[${ userId }])));
+            `));
 
         return true;
     }
@@ -338,6 +382,60 @@ export class AuthResolver {
         session.user!.channelId = channelId;
 
         pubsub.publish(NEW_NOTIFICATION, { message: `${ user!.username } has joined`, channelId: channel.id });
+        pubsub.publish(JOIN_CHANNEL, { user: updatedUser, channelId });
+
+        return true;
+    }
+
+    @UseMiddleware(isAuthenticated)
+    @Mutation(() => Boolean)
+    async nativeJoinChannel (
+        @Ctx()
+        { redis }: MyContext,
+        @Arg('channelId')
+        channelId: number,
+        @PubSub()
+        pubsub: PubSubEngine
+    ): Promise<boolean> {
+
+        const redUser = await redis.get(RED_CURRENT_USER);
+        const user = parse(redUser!) as UserEntity;
+
+        if (user.channelId) {
+            throw new ErrorResponse('One channel at a time.', 401);
+        }
+
+        const channel = await ChannelEntity.findOne(channelId);
+
+        if (!channel) {
+            throw new ErrorResponse('Channel does not exist', 404);
+        }
+
+        if (channel.userIds && channel.userIds.includes(user.id)) {
+            throw new ErrorResponse('You have already joined', 404);
+        }
+
+        await getConnection().transaction(async tn => {
+            await tn.query(`
+                UPDATE channel_entity
+                SET "userIds" = "userIds" || ${ user.id }
+                WHERE id = ${ channelId };
+            `);
+
+            await tn.query(`
+                UPDATE user_entity
+                SET "channelId" = ${ channelId }
+                WHERE id = ${ user.id }
+            `);
+        });
+
+        const updatedUser = await UserEntity.findOne(user.id);
+
+        await redis.del(RED_CURRENT_USER);
+
+        await redis.set(RED_CURRENT_USER, stringify(updatedUser));
+
+        pubsub.publish(NEW_NOTIFICATION, { message: `${ user.username } has joined`, channelId: channel.id });
         pubsub.publish(JOIN_CHANNEL, { user: updatedUser, channelId });
 
         return true;
@@ -406,6 +504,56 @@ export class AuthResolver {
 
     @UseMiddleware(isAuthenticated)
     @Mutation(() => Boolean)
+    async nativeLeaveChannel (
+        @Ctx()
+        { redis }: MyContext,
+        @Arg('channelId')
+        channelId: number,
+        @PubSub()
+        pubsub: PubSubEngine
+    ): Promise<boolean> {
+
+        const redUser = await redis.get(RED_CURRENT_USER);
+        const user = parse(redUser!) as UserEntity;
+
+        if (!user.channelId) {
+            throw new ErrorResponse('Join some channel first', 401);
+        }
+
+        const channel = await ChannelEntity.findOne(channelId);
+
+        if (channel!.userIds && !channel!.userIds.includes(user.id)) {
+            throw new ErrorResponse('You have already left', 404);
+        }
+
+        const userId = user.id;
+
+        await getConnection().transaction(async tn => {
+            await tn.query(`
+                UPDATE channel_entity SET "userIds" = (SELECT ARRAY(SELECT UNNEST("userIds")
+                EXCEPT
+                SELECT UNNEST(ARRAY[${ userId }])));
+            `);
+            await tn.query(`
+                UPDATE user_entity
+                SET "channelId" = NULL
+                WHERE id = ${ userId }
+            `);
+        });
+
+        const updatedUser = await UserEntity.findOne(user.id);
+
+        await redis.del(RED_CURRENT_USER);
+        await redis.set(RED_CURRENT_USER, stringify(updatedUser));
+
+        pubsub.publish(NEW_NOTIFICATION, { message: `${ updatedUser?.username } has left`, channelId: channel!.id });
+        pubsub.publish(LEAVE_CHANNEL, { user: updatedUser, channelId });
+
+        return true;
+    }
+
+    @UseMiddleware(isAuthenticated)
+    @Mutation(() => Boolean)
     async deleteUser (
         @Ctx()
         { session }: MyContext
@@ -441,6 +589,45 @@ export class AuthResolver {
                 console.log(`Session destruction error:`.red.bold);
                 console.error(err);
             }
+        });
+
+        return true;
+    }
+
+    @UseMiddleware(isAuthenticated)
+    @Mutation(() => Boolean)
+    async nativeDeleteUser (
+        @Ctx()
+        { redis }: MyContext
+    ): Promise<boolean> {
+
+        const redUser = await redis.get(RED_CURRENT_USER);
+
+        const user = parse(redUser!) as UserEntity;
+
+        const userId = user.id;
+
+        const messages = await MessageEntity.find({ posterId: userId });
+
+        const messageIds = messages.map(mess => mess.id);
+
+        await getConnection().transaction(async tn => {
+            await tn.query(`
+            UPDATE channel_entity SET "messageIds" = (SELECT ARRAY(SELECT UNNEST("messageIds")
+                EXCEPT 
+                SELECT UNNEST(ARRAY[${ messageIds }])));
+            `);
+
+            await tn.query(`
+                DELETE FROM message_entity
+                WHERE "posterId" = ${ userId };
+            `);
+
+            await tn.query(`
+                DELETE FROM user_entity
+                WHERE id = ${ userId }
+            `);
+
         });
 
         return true;

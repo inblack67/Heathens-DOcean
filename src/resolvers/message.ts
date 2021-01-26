@@ -9,6 +9,8 @@ import { getConnection } from "typeorm";
 import { NEW_MESSAGE, REMOVED_MESSAGE } from "../utils/topics";
 import { decryptMe, encryptMe } from "../utils/encryption";
 import crypto from 'crypto';
+import { RED_CURRENT_USER } from "../utils/redisKeys";
+import { parse } from "flatted";
 
 
 @ObjectType()
@@ -60,6 +62,45 @@ export class MessageResolver {
         }
 
         const userId = session.user!.id;
+
+        if (!channel.userIds || !channel.userIds.includes(userId)) {
+            throw new ErrorResponse('You must join the channel first', 404);
+        }
+
+        const iv = crypto.randomBytes(16);
+        var ivString = iv.toString('hex').slice(0, 16);
+        const encryptedMessage = encryptMe(content, ivString);
+        const newMessage = await MessageEntity.create({ content: encryptedMessage, posterId: userId, channelId, ivString }).save();
+        await getConnection().query((`
+                UPDATE channel_entity
+                SET "messageIds" = "messageIds" || ${ newMessage.id }
+                WHERE id = ${ channelId }
+            `));
+
+        await pubsub.publish(NEW_MESSAGE, newMessage);
+        return newMessage;
+    }
+
+    @UseMiddleware(isAuthenticated)
+    @Mutation(() => MessageEntity, {})
+    async nativePostMessage (
+        @Arg('content')
+        content: string,
+        @Arg('channelId')
+        channelId: number,
+        @Ctx()
+        { redis }: MyContext,
+        @PubSub()
+        pubsub: PubSubEngine
+    ): Promise<MessageEntity> {
+        const channel = await ChannelEntity.findOne(channelId);
+        if (!channel) {
+            throw new ErrorResponse('Resource does not exits', 404);
+        }
+
+        const redUser = await redis.get(RED_CURRENT_USER);
+        const user = parse(redUser!) as UserEntity;
+        const userId = user.id;
 
         if (!channel.userIds || !channel.userIds.includes(userId)) {
             throw new ErrorResponse('You must join the channel first', 404);
@@ -137,12 +178,72 @@ export class MessageResolver {
     }
 
     @UseMiddleware(isAuthenticated)
+    @Query(() => PaginatedMessages, {})
+    async nativeGetChannelMessages (
+        @Arg('channelId')
+        channelId: number,
+        @Arg('limit')
+        limit: number,
+        @Ctx()
+        { redis }: MyContext,
+        @Arg('cursor', { nullable: true })
+        cursor?: string,
+    ): Promise<PaginatedMessages> {
+
+        const channel = await ChannelEntity.findOne(channelId);
+
+        if (!channel) {
+            throw new ErrorResponse('Channel does not exists', 401);
+        }
+
+        const redUser = await redis.get(RED_CURRENT_USER);
+        const user = parse(redUser!) as UserEntity;
+        const userId = user.id;
+
+        if (!channel.userIds.includes(userId)) {
+            throw new ErrorResponse('You have to join the channel first', 401);
+        }
+
+        // at max 10 messages
+        const realLimit = Math.min(10, limit);
+
+        // for hasMore
+        const reaLimitPlusOne = realLimit + 1;
+
+        const replacements: any[] = [ reaLimitPlusOne ];
+
+        if (cursor) {
+            replacements.push(new Date(parseInt(cursor)));
+        }
+
+        const messages: MessageEntity[] = await getConnection().query(
+            `
+                SELECT * FROM message_entity 
+                WHERE "channelId" = ${ channelId } 
+                ${ cursor ? `AND "createdAt" < $2` : `` }
+                ORDER BY "createdAt" DESC
+                LIMIT $1;
+            `,
+            replacements
+        );
+
+        messages.forEach(mess => {
+            mess.content = decryptMe(mess.content, mess.ivString);
+        });
+
+        return {
+            messages: messages.slice(0, realLimit),
+            hasMore: messages.length === reaLimitPlusOne // even the extra one came along => hasMore => true
+        };
+    }
+
+    @UseMiddleware(isAuthenticated)
     @Mutation(() => Boolean, {})
     async deleteMessage (
         @Arg('id')
         id: number,
         @Ctx()
-        { session }: MyContext,
+        { redis }: MyContext,
         @PubSub()
         pubsub: PubSubEngine
     ): Promise<boolean> {
@@ -152,7 +253,9 @@ export class MessageResolver {
             throw new ErrorResponse('Resource does not exits', 404);
         }
 
-        const userId = session.user!.id;
+        const redUser = await redis.get(RED_CURRENT_USER);
+        const user = parse(redUser!) as UserEntity;
+        const userId = user.id;
 
         if (message.posterId !== userId) {
             throw new ErrorResponse('Not Authorized', 400);
