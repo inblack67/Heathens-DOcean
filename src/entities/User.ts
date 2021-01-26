@@ -9,6 +9,10 @@ import { MessageEntity } from "./Message";
 export class UserEntity extends BaseEntity {
 
     @Field(() => String)
+    @Column({ default: null })
+    ivString?: string;
+
+    @Field(() => String)
     @Column({ default: v4() })
     _id: string;
 

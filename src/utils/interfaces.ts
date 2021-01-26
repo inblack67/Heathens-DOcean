@@ -24,4 +24,5 @@ export interface IEmail {
 export interface IJwt {
     iat: Date,
     _id: string;
+    exp: Date
 }

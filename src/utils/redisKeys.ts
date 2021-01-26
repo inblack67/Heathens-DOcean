@@ -1,3 +1,4 @@
+export const RED_TOKEN_IV = 'RED_TOKEN_IV';
 export const RED_CURRENT_USER = 'RED_CURRENT_USER';
 export const RED_CHANNELS = 'RED_CHANNELS';
 export const RED_CHANNEL_MESSAGES = 'RED_CHANNEL_MESSAGES';

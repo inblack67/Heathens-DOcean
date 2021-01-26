@@ -12,9 +12,11 @@ import { recaptchaTest } from "../utils/validateHuman";
 import { sendMail } from "../utils/sendMails";
 import path from 'path';
 import { v4 } from 'uuid';
-import { RED_CURRENT_USER, RED_FORGOT_PASSWORD_TOKEN, RED_VERIFY_EMAIL_TOKEN } from '../utils/redisKeys';
+import { RED_CURRENT_USER, RED_FORGOT_PASSWORD_TOKEN, RED_TOKEN_IV, RED_VERIFY_EMAIL_TOKEN } from '../utils/redisKeys';
 import jwt from 'jsonwebtoken';
 import { parse, stringify } from "flatted";
+import { encryptMe } from "../utils/encryption";
+import crypto from 'crypto';
 
 @Resolver(UserEntity)
 export class AuthResolver {
@@ -243,9 +245,15 @@ export class AuthResolver {
             expiresIn: '1d',
         });
 
+        const iv = crypto.randomBytes(16);
+        var ivString = iv.toString('hex').slice(0, 16);
+        await redis.set(RED_TOKEN_IV, ivString);
+
+        const encryptedToken = encryptMe(token, ivString);
+
         await redis.set(RED_CURRENT_USER, stringify(user));
 
-        return token;
+        return encryptedToken;
     }
 
     @UseMiddleware(isAuthenticated)
