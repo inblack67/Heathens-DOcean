@@ -334,12 +334,13 @@ export class AuthResolver {
             pubsub.publish(LEAVE_CHANNEL, { user: updatedUser, channelId });
         }
 
-
         await getConnection().query((`
                 UPDATE channel_entity SET "userIds" = (SELECT ARRAY(SELECT UNNEST("userIds")
                 EXCEPT
                 SELECT UNNEST(ARRAY[${ userId }])));
             `));
+
+        await redis.del(RED_CURRENT_USER);
 
         return true;
     }
@@ -460,6 +461,21 @@ export class AuthResolver {
             throw new ErrorResponse('None joined', 401);
         }
         const channel = await ChannelEntity.findOne(user!.channelId);
+        return channel!;
+    }
+
+    @UseMiddleware(isAuthenticated)
+    @Query(() => ChannelEntity)
+    async nativeGetMyChannel (
+        @Ctx()
+        { redis }: MyContext
+    ): Promise<ChannelEntity> {
+        const redUser = await redis.get(RED_CURRENT_USER);
+        const user = parse(redUser!) as UserEntity;
+        if (!user.channelId) {
+            throw new ErrorResponse('None joined', 401);
+        }
+        const channel = await ChannelEntity.findOne(user.channelId);
         return channel!;
     }
 
