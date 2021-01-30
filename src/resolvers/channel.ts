@@ -32,7 +32,7 @@ export class ChannelResolver {
         channel: ChannelEntity,
         @Ctx()
         { messagesLoader }: MyContext,
-    ): Promise<(MessageEntity | Error)[]> | [] {
+    ) {
         if (!channel.messageIds) {
             return [];
         }
@@ -51,7 +51,7 @@ export class ChannelResolver {
     }
 
     @UseMiddleware(isAuthenticated)
-    @Query(() => ChannelEntity, { nullable: true, })
+    @Query(() => ChannelEntity, { nullable: true })
     async getSingleChannel (
         @Arg('id')
         id: number,
