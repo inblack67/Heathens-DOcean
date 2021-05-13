@@ -1,17 +1,16 @@
 declare namespace NodeJS {
-  export interface ProcessEnv {
-    CLIENT_URL: string;
-    PORT: string;
+  interface ProcessEnv {
     SESSION_SECRET: string;
-    COOKIE_DOMAIN: string;
+    CLIENT_URL: string;
     NODE_ENV: string;
     RECAPTCHA_SECRET: string;
-    POSTGRES_PASSWORD: string;
-    POSTGRES_USER: string;
-    POSTGRES_DB: string;
     CRYPTO_KEY: string;
     QUERY_LIMIT: string;
     EMAIL: string;
     PASSWORD: string;
+    POSTGRES_DB: string;
+    POSTGRES_USER: string;
+    POSTGRES_PASSWORD: string;
+    COOKIE_DOMAIN: string;
   }
 }

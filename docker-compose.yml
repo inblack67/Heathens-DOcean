@@ -1,32 +1,59 @@
-version: "3.8"
+version: '3.8'
 services:
+  load_balancer:
+    image: nginx
+    ports:
+      - '80:80'
+    volumes:
+      - ./nginx:/etc/nginx
+    depends_on:
+      - web1
+      - web2
   redis:
     image: redis
-    networks: 
-      - webnet
   db:
     image: postgres
-    ports:
-      - "3030:5432"
-    volumes: 
+    volumes:
       - ./pgdata:/var/lib/postgresql/data
-    networks: 
-      - webnet
-    env_file: 
+    env_file:
       - .env
-  web:
-    image: inblack67/slack:latest
-    ports: 
-      - "5000:5000"
-    networks:
-      - webnet
+  web1:
+    image: inblack67/heathens:latest
     depends_on:
       - db
       - redis
     environment:
       DB_HOST: db
       REDIS_HOST: redis
-    env_file: 
-      .env
-networks:
-  webnet:
+      PORT: 5001
+    env_file: .env
+  web2:
+    image: inblack67/heathens:latest
+    depends_on:
+      - db
+      - redis
+    environment:
+      DB_HOST: db
+      REDIS_HOST: redis
+      PORT: 5002
+    env_file: .env
+  web3:
+    image: inblack67/heathens:latest
+    depends_on:
+      - db
+      - redis
+    environment:
+      DB_HOST: db
+      REDIS_HOST: redis
+      PORT: 5003
+    env_file: .env
+  web4:
+    image: inblack67/heathens:latest
+    depends_on:
+      - db
+      - redis
+    environment:
+      DB_HOST: db
+      REDIS_HOST: redis
+      PORT: 5004
+    env_file: .env
