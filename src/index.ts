@@ -68,17 +68,19 @@ const main = async () => {
 
     app.set('trust proxy', 1);
 
-    app.use(cors({
-        origin: isProd() ? (origin, cb) => {
-            if (!origin || origin !== process.env.CLIENT_URL) {
-                cb(new ErrorResponse('Maybe some other time', 401), false);
-            } else {
-                cb(null, true);
-            }
-        } : process.env.CLIENT_URL,
-        credentials: true,
-        optionsSuccessStatus: 200
-    }));
+    app.use(cors());
+
+    // app.use(cors({
+    //     origin: isProd() ? (origin, cb) => {
+    //         if (!origin || origin !== process.env.CLIENT_URL) {
+    //             cb(new ErrorResponse('Maybe some other time', 401), false);
+    //         } else {
+    //             cb(null, true);
+    //         }
+    //     } : process.env.CLIENT_URL,
+    //     credentials: true,
+    //     optionsSuccessStatus: 200
+    // }));
 
     app.get('/', (_: Request, res: Response) => {
         res.send(`API up and runnin at port ${PORT}`);

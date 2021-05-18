@@ -8,7 +8,7 @@ RUN yarn
 
 RUN yarn build
 
-ENV NODE_ENV=production
+ENV NODE_ENV=develpment
 
 CMD [ "node", "dist/index.js" ]
 
